@@ -9,7 +9,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
-
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.GridInputController;
 import com.droiddungeon.grid.Player;
@@ -32,7 +31,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         InputMultiplexer multiplexer = new InputMultiplexer(
                 stage,
-                new GridInputController(grid, player, stage)
+            new GridInputController(grid, player)
         );
         Gdx.input.setInputProcessor(multiplexer);
     }
@@ -47,7 +46,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        stage.act(Gdx.graphics.getDeltaTime());
+        float delta = Gdx.graphics.getDeltaTime();
+        stage.act(delta);
+        player.update(delta, 10f);
 
         stage.getViewport().apply();
         shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
@@ -90,8 +91,8 @@ public class DroidDungeonGame extends ApplicationAdapter {
         shapeRenderer.end();
 
         // Player (circle that occupies 1 tile)
-        float centerX = gridOriginX + (player.getGridX() + 0.5f) * tileSize;
-        float centerY = gridOriginY + (player.getGridY() + 0.5f) * tileSize;
+        float centerX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
+        float centerY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
         float radius = tileSize * 0.42f;
 
         shapeRenderer.begin(ShapeType.Filled);
