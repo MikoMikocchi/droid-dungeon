@@ -1,0 +1,14 @@
+.gradle/
+**/build/
+**/out/
+.metals/
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
