@@ -1,9 +1,16 @@
 package com.droiddungeon.render;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.MathUtils;
@@ -19,11 +26,23 @@ import java.util.List;
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final SpriteBatch spriteBatch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
+    private final Texture whiteTexture;
+    private final TextureRegion whiteRegion;
 
     public WorldRenderer() {
-        font.getData().setScale(0.8f);
+        font = loadFont();
+        font.setUseIntegerPositions(true);
+        font.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(Color.WHITE);
+        pixmap.fill();
+        whiteTexture = new Texture(pixmap);
+        whiteTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        whiteRegion = new TextureRegion(whiteTexture);
+        pixmap.dispose();
     }
 
     public void render(Stage stage, Grid grid, Player player, List<GroundItem> groundItems, ItemRegistry itemRegistry) {
@@ -101,9 +120,9 @@ public final class WorldRenderer {
             if (groundItem.getStack().count() > 1) {
                 String countText = Integer.toString(groundItem.getStack().count());
                 glyphLayout.setText(font, countText);
-                float textX = drawX + drawSize - glyphLayout.width - 3f;
+                float textX = drawX + drawSize - glyphLayout.width - 2f;
                 float textY = drawY + glyphLayout.height + 2f;
-                font.draw(spriteBatch, glyphLayout, textX, textY);
+                drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
             }
         }
         spriteBatch.end();
@@ -124,5 +143,46 @@ public final class WorldRenderer {
         shapeRenderer.dispose();
         spriteBatch.dispose();
         font.dispose();
+        whiteTexture.dispose();
+    }
+
+    private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {
+        float bgPadX = 3f;
+        float bgPadY = 1.5f;
+        float bgX = x - bgPadX;
+        float bgY = y - textHeight - bgPadY * 0.5f;
+        float bgWidth = textWidth + bgPadX * 2f;
+        float bgHeight = textHeight + bgPadY * 2f;
+
+        batch.setColor(0f, 0f, 0f, 0.65f);
+        batch.draw(whiteRegion, Math.round(bgX), Math.round(bgY), Math.round(bgWidth), Math.round(bgHeight));
+        batch.setColor(Color.WHITE);
+
+        font.setColor(Color.WHITE);
+        font.draw(batch, text, Math.round(x), Math.round(y));
+    }
+
+    private BitmapFont loadFont() {
+        FreeTypeFontGenerator generator = null;
+        try {
+            generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/minecraft_font.ttf"));
+            FreeTypeFontParameter params = new FreeTypeFontParameter();
+            params.size = 13;
+            params.borderWidth = 0.9f;
+            params.borderColor = new Color(0f, 0f, 0f, 0.6f);
+            params.minFilter = TextureFilter.Nearest;
+            params.magFilter = TextureFilter.Nearest;
+            params.color = Color.WHITE;
+            return generator.generateFont(params);
+        } catch (Exception e) {
+            Gdx.app.error("WorldRenderer", "Failed to load custom font, falling back to default", e);
+            BitmapFont fallback = new BitmapFont();
+            fallback.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            return fallback;
+        } finally {
+            if (generator != null) {
+                generator.dispose();
+            }
+        }
     }
 }

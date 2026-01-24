@@ -2,10 +2,16 @@ package com.droiddungeon.ui;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
@@ -18,8 +24,10 @@ import com.droiddungeon.items.ItemRegistry;
 public final class HudRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final SpriteBatch spriteBatch = new SpriteBatch();
-    private final BitmapFont font = new BitmapFont();
+    private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
+    private final Texture whiteTexture;
+    private final TextureRegion whiteRegion;
 
     private final float cellSize = 48f;
     private final float gap = 6f;
@@ -30,7 +38,17 @@ public final class HudRenderer {
     private int lastRows;
 
     public HudRenderer() {
-        font.getData().setScale(0.9f);
+        font = loadFont();
+        font.setUseIntegerPositions(true);
+        font.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(Color.WHITE);
+        pixmap.fill();
+        whiteTexture = new Texture(pixmap);
+        whiteTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        whiteRegion = new TextureRegion(whiteTexture);
+        pixmap.dispose();
     }
 
     public void render(
@@ -40,6 +58,7 @@ public final class HudRenderer {
             ItemStack cursorStack,
             boolean inventoryOpen,
             int selectedSlotIndex,
+            int hoveredSlotIndex,
             float deltaSeconds
     ) {
         stage.getViewport().apply();
@@ -54,6 +73,7 @@ public final class HudRenderer {
 
         renderSlotGrid(inventory, selectedSlotIndex);
         renderSlotContents(inventory, itemRegistry);
+        renderTooltip(stage, inventory, itemRegistry, hoveredSlotIndex);
         renderCursorStack(stage, itemRegistry, cursorStack);
     }
 
@@ -157,7 +177,7 @@ public final class HudRenderer {
                 glyphLayout.setText(font, countText);
                 float textX = drawX + drawSize - glyphLayout.width + 2f;
                 float textY = drawY + glyphLayout.height + 2f;
-                font.draw(spriteBatch, glyphLayout, textX, textY);
+                drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
             }
         }
         spriteBatch.end();
@@ -186,8 +206,101 @@ public final class HudRenderer {
         glyphLayout.setText(font, countText);
         float textX = drawX + drawSize - glyphLayout.width + 2f;
         float textY = drawY + glyphLayout.height + 2f;
-        font.draw(spriteBatch, glyphLayout, textX, textY);
+        drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
         spriteBatch.end();
+    }
+
+    private void renderTooltip(Stage stage, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
+        if (hoveredSlotIndex < 0 || hoveredSlotIndex >= Inventory.TOTAL_SLOTS) {
+            return;
+        }
+        ItemStack stack = inventory.get(hoveredSlotIndex);
+        if (stack == null) {
+            return;
+        }
+        ItemDefinition def = itemRegistry.get(stack.itemId());
+        if (def == null) {
+            return;
+        }
+
+        Vector2 world = stage.getViewport().unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        String text = def.displayName();
+        glyphLayout.setText(font, text);
+
+        float paddingX = 8f;
+        float paddingY = 6f;
+        float boxWidth = glyphLayout.width + paddingX * 2f;
+        float boxHeight = glyphLayout.height + paddingY * 2f;
+
+        float x = world.x + 16f;
+        float y = world.y + 20f;
+
+        float viewportWidth = stage.getViewport().getWorldWidth();
+        float viewportHeight = stage.getViewport().getWorldHeight();
+        if (x + boxWidth > viewportWidth - 4f) {
+            x = viewportWidth - boxWidth - 4f;
+        }
+        if (y + boxHeight > viewportHeight - 4f) {
+            y = viewportHeight - boxHeight - 4f;
+        }
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0.05f, 0.05f, 0.08f, 0.9f);
+        shapeRenderer.rect(x, y, boxWidth, boxHeight);
+        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
+        shapeRenderer.rect(x, y, boxWidth, 2f);
+        shapeRenderer.rect(x, y, 2f, boxHeight);
+        shapeRenderer.rect(x + boxWidth - 2f, y, 2f, boxHeight);
+        shapeRenderer.rect(x, y + boxHeight - 2f, boxWidth, 2f);
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        spriteBatch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, x + paddingX, y + paddingY + glyphLayout.height);
+        spriteBatch.end();
+    }
+
+    private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {
+        float bgPadX = 3f;
+        float bgPadY = 1.5f;
+        float bgX = x - bgPadX;
+        float bgY = y - textHeight - bgPadY * 0.5f;
+        float bgWidth = textWidth + bgPadX * 2f;
+        float bgHeight = textHeight + bgPadY * 2f;
+
+        batch.setColor(0f, 0f, 0f, 0.65f);
+        batch.draw(whiteRegion, Math.round(bgX), Math.round(bgY), Math.round(bgWidth), Math.round(bgHeight));
+        batch.setColor(Color.WHITE);
+
+        font.setColor(Color.WHITE);
+        font.draw(batch, text, Math.round(x), Math.round(y));
+    }
+
+    private BitmapFont loadFont() {
+        FreeTypeFontGenerator generator = null;
+        try {
+            generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/minecraft_font.ttf"));
+            FreeTypeFontParameter params = new FreeTypeFontParameter();
+            params.size = 14;
+            params.borderWidth = 0.9f;
+            params.borderColor = new Color(0f, 0f, 0f, 0.6f);
+            params.minFilter = TextureFilter.Nearest;
+            params.magFilter = TextureFilter.Nearest;
+            params.color = Color.WHITE;
+            return generator.generateFont(params);
+        } catch (Exception e) {
+            Gdx.app.error("HudRenderer", "Failed to load custom font, falling back to default", e);
+            BitmapFont fallback = new BitmapFont();
+            fallback.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            return fallback;
+        } finally {
+            if (generator != null) {
+                generator.dispose();
+            }
+        }
     }
 
     public int hitTestSlot(Stage stage, float screenX, float screenY, boolean inventoryOpen) {
@@ -211,5 +324,6 @@ public final class HudRenderer {
         shapeRenderer.dispose();
         spriteBatch.dispose();
         font.dispose();
+        whiteTexture.dispose();
     }
 }

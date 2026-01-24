@@ -91,6 +91,11 @@ public class DroidDungeonGame extends ApplicationAdapter {
         float delta = Gdx.graphics.getDeltaTime();
         stage.act(delta);
 
+        int hoveredSlot = -1;
+        if (inventoryOpen) {
+            hoveredSlot = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), true);
+        }
+
         if (Gdx.input.justTouched()) {
             int clicked = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), inventoryOpen);
             if (clicked != -1) {
@@ -105,7 +110,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         player.update(delta, 10f);
 
         worldRenderer.render(stage, grid, player, groundItems, itemRegistry);
-        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, delta);
+        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta);
 
         stage.draw();
     }
