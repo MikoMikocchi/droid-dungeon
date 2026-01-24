@@ -2,14 +2,24 @@ package com.droiddungeon.ui;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.droiddungeon.inventory.Inventory;
+import com.droiddungeon.inventory.ItemStack;
+import com.droiddungeon.items.ItemDefinition;
+import com.droiddungeon.items.ItemRegistry;
 
 public final class HudRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
+    private final SpriteBatch spriteBatch = new SpriteBatch();
+    private final BitmapFont font = new BitmapFont();
+    private final GlyphLayout glyphLayout = new GlyphLayout();
 
     private final float cellSize = 48f;
     private final float gap = 6f;
@@ -19,28 +29,40 @@ public final class HudRenderer {
     private float lastOriginY;
     private int lastRows;
 
-    public void render(Stage stage, Inventory inventory, boolean inventoryOpen, int selectedSlotIndex, float deltaSeconds) {
+    public HudRenderer() {
+        font.getData().setScale(0.9f);
+    }
+
+    public void render(
+            Stage stage,
+            Inventory inventory,
+            ItemRegistry itemRegistry,
+            ItemStack cursorStack,
+            boolean inventoryOpen,
+            int selectedSlotIndex,
+            float deltaSeconds
+    ) {
         stage.getViewport().apply();
         shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
+        spriteBatch.setProjectionMatrix(stage.getCamera().combined);
 
-        float viewportWidth = stage.getViewport().getWorldWidth();
-        float viewportHeight = stage.getViewport().getWorldHeight();
-
-        float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
-        float originX = (viewportWidth - hotbarWidth) * 0.5f;
-        float originY = padding;
-
-        int rows = inventoryOpen ? 4 : 1;
-
-        lastOriginX = originX;
-        lastOriginY = originY;
-        lastRows = rows;
+        cacheLayout(stage, inventoryOpen);
 
         if (inventoryOpen) {
-            renderInventoryBackdrop(viewportWidth, viewportHeight);
+            renderInventoryBackdrop(stage.getViewport().getWorldWidth(), stage.getViewport().getWorldHeight());
         }
 
-        renderSlotGrid(originX, originY, rows, inventory, selectedSlotIndex);
+        renderSlotGrid(inventory, selectedSlotIndex);
+        renderSlotContents(inventory, itemRegistry);
+        renderCursorStack(stage, itemRegistry, cursorStack);
+    }
+
+    private void cacheLayout(Stage stage, boolean inventoryOpen) {
+        float viewportWidth = stage.getViewport().getWorldWidth();
+        float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
+        lastOriginX = (viewportWidth - hotbarWidth) * 0.5f;
+        lastOriginY = padding;
+        lastRows = inventoryOpen ? 4 : 1;
     }
 
     private void renderInventoryBackdrop(float viewportWidth, float viewportHeight) {
@@ -53,13 +75,13 @@ public final class HudRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void renderSlotGrid(float originX, float originY, int rows, Inventory inventory, int selectedSlotIndex) {
+    private void renderSlotGrid(Inventory inventory, int selectedSlotIndex) {
         // Filled cells.
         shapeRenderer.begin(ShapeType.Filled);
-        for (int row = 0; row < rows; row++) {
+        for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
-                float x = originX + col * (cellSize + gap);
-                float y = originY + row * (cellSize + gap);
+                float x = lastOriginX + col * (cellSize + gap);
+                float y = lastOriginY + row * (cellSize + gap);
 
                 boolean isHotbar = row == 0;
                 if (isHotbar) {
@@ -81,10 +103,10 @@ public final class HudRenderer {
         // Outlines.
         shapeRenderer.begin(ShapeType.Line);
         shapeRenderer.setColor(0.30f, 0.30f, 0.34f, 1f);
-        for (int row = 0; row < rows; row++) {
+        for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
-                float x = originX + col * (cellSize + gap);
-                float y = originY + row * (cellSize + gap);
+                float x = lastOriginX + col * (cellSize + gap);
+                float y = lastOriginY + row * (cellSize + gap);
                 shapeRenderer.rect(x, y, cellSize, cellSize);
             }
         }
@@ -95,9 +117,9 @@ public final class HudRenderer {
             int selectedRow = selectedSlotIndex / Inventory.HOTBAR_SLOTS;
             int selectedCol = selectedSlotIndex % Inventory.HOTBAR_SLOTS;
 
-            if (selectedRow >= 0 && selectedRow < rows) {
-                float x = originX + selectedCol * (cellSize + gap);
-                float y = originY + selectedRow * (cellSize + gap);
+            if (selectedRow >= 0 && selectedRow < lastRows) {
+                float x = lastOriginX + selectedCol * (cellSize + gap);
+                float y = lastOriginY + selectedRow * (cellSize + gap);
 
                 float thickness = 3f;
                 shapeRenderer.begin(ShapeType.Filled);
@@ -111,7 +133,65 @@ public final class HudRenderer {
         }
     }
 
-    public int hitTestSlot(Stage stage, float screenX, float screenY) {
+    private void renderSlotContents(Inventory inventory, ItemRegistry itemRegistry) {
+        spriteBatch.begin();
+        for (int row = 0; row < lastRows; row++) {
+            for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
+                int slotIndex = row * Inventory.HOTBAR_SLOTS + col;
+                ItemStack stack = inventory.get(slotIndex);
+                if (stack == null) {
+                    continue;
+                }
+                ItemDefinition def = itemRegistry.get(stack.itemId());
+                if (def == null) {
+                    continue;
+                }
+                TextureRegion icon = def.icon();
+                float iconPadding = 8f;
+                float drawSize = cellSize - iconPadding * 2f;
+                float drawX = lastOriginX + col * (cellSize + gap) + iconPadding;
+                float drawY = lastOriginY + row * (cellSize + gap) + iconPadding;
+                spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
+
+                String countText = Integer.toString(stack.count());
+                glyphLayout.setText(font, countText);
+                float textX = drawX + drawSize - glyphLayout.width + 2f;
+                float textY = drawY + glyphLayout.height + 2f;
+                font.draw(spriteBatch, glyphLayout, textX, textY);
+            }
+        }
+        spriteBatch.end();
+    }
+
+    private void renderCursorStack(Stage stage, ItemRegistry registry, ItemStack cursorStack) {
+        if (cursorStack == null) {
+            return;
+        }
+        ItemDefinition def = registry.get(cursorStack.itemId());
+        if (def == null) {
+            return;
+        }
+
+        Vector2 screen = new Vector2(Gdx.input.getX(), Gdx.input.getY());
+        Vector2 world = stage.getViewport().unproject(screen);
+        TextureRegion icon = def.icon();
+        float iconPadding = 6f;
+        float drawSize = cellSize - iconPadding * 2f;
+        float drawX = world.x - drawSize * 0.5f;
+        float drawY = world.y - drawSize * 0.5f;
+
+        spriteBatch.begin();
+        spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
+        String countText = Integer.toString(cursorStack.count());
+        glyphLayout.setText(font, countText);
+        float textX = drawX + drawSize - glyphLayout.width + 2f;
+        float textY = drawY + glyphLayout.height + 2f;
+        font.draw(spriteBatch, glyphLayout, textX, textY);
+        spriteBatch.end();
+    }
+
+    public int hitTestSlot(Stage stage, float screenX, float screenY, boolean inventoryOpen) {
+        cacheLayout(stage, inventoryOpen);
         Vector2 world = new Vector2(screenX, screenY);
         stage.getViewport().unproject(world);
 
@@ -129,5 +209,7 @@ public final class HudRenderer {
 
     public void dispose() {
         shapeRenderer.dispose();
+        spriteBatch.dispose();
+        font.dispose();
     }
 }

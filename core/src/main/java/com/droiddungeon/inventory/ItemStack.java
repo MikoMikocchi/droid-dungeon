@@ -9,4 +9,8 @@ public record ItemStack(String itemId, int count) {
             throw new IllegalArgumentException("count must be > 0");
         }
     }
+
+    public ItemStack withCount(int newCount) {
+        return new ItemStack(itemId, newCount);
+    }
 }

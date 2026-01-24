@@ -1,0 +1,2 @@
+# id;displayName;maxStack;texturePath
+test_chip;Test Chip;32;items/test_chip.png
