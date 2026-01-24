@@ -2,7 +2,7 @@ package com.droiddungeon;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputMultiplexer;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
@@ -10,15 +10,23 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.droiddungeon.grid.Grid;
-import com.droiddungeon.grid.GridInputController;
 import com.droiddungeon.grid.Player;
 
 public class DroidDungeonGame extends ApplicationAdapter {
+    private enum MoveDir {
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN
+    }
+
     private Stage stage;
     private ShapeRenderer shapeRenderer;
 
     private Grid grid;
     private Player player;
+
+    private MoveDir preferredDir = MoveDir.RIGHT;
 
     @Override
     public void create() {
@@ -29,11 +37,8 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         shapeRenderer = new ShapeRenderer();
 
-        InputMultiplexer multiplexer = new InputMultiplexer(
-                stage,
-            new GridInputController(grid, player)
-        );
-        Gdx.input.setInputProcessor(multiplexer);
+        // Input is handled by polling (for held-key movement)
+        Gdx.input.setInputProcessor(stage);
     }
 
     @Override
@@ -48,6 +53,8 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         float delta = Gdx.graphics.getDeltaTime();
         stage.act(delta);
+
+        handleHeldMovement();
         player.update(delta, 10f);
 
         stage.getViewport().apply();
@@ -101,6 +108,92 @@ public class DroidDungeonGame extends ApplicationAdapter {
         shapeRenderer.end();
 
         stage.draw();
+    }
+
+    private void handleHeldMovement() {
+        if (player.isMoving()) {
+            return;
+        }
+
+        boolean leftHeld = Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A);
+        boolean rightHeld = Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D);
+        boolean upHeld = Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W);
+        boolean downHeld = Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S);
+
+        boolean leftPressed = Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A);
+        boolean rightPressed = Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D);
+        boolean upPressed = Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W);
+        boolean downPressed = Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S);
+
+        if (leftPressed) {
+            preferredDir = MoveDir.LEFT;
+        }
+        if (rightPressed) {
+            preferredDir = MoveDir.RIGHT;
+        }
+        if (upPressed) {
+            preferredDir = MoveDir.UP;
+        }
+        if (downPressed) {
+            preferredDir = MoveDir.DOWN;
+        }
+
+        MoveDir chosen = null;
+        if (isHeld(preferredDir, leftHeld, rightHeld, upHeld, downHeld)) {
+            chosen = preferredDir;
+        } else if (leftHeld && !rightHeld) {
+            chosen = MoveDir.LEFT;
+        } else if (rightHeld && !leftHeld) {
+            chosen = MoveDir.RIGHT;
+        } else if (upHeld && !downHeld) {
+            chosen = MoveDir.UP;
+        } else if (downHeld && !upHeld) {
+            chosen = MoveDir.DOWN;
+        } else if (leftHeld || rightHeld || upHeld || downHeld) {
+            chosen = leftHeld ? MoveDir.LEFT : (rightHeld ? MoveDir.RIGHT : (upHeld ? MoveDir.UP : MoveDir.DOWN));
+        }
+
+        if (chosen == null) {
+            return;
+        }
+
+        int dx;
+        int dy;
+        switch (chosen) {
+            case LEFT -> {
+                dx = -1;
+                dy = 0;
+            }
+            case RIGHT -> {
+                dx = 1;
+                dy = 0;
+            }
+            case UP -> {
+                dx = 0;
+                dy = 1;
+            }
+            case DOWN -> {
+                dx = 0;
+                dy = -1;
+            }
+            default -> {
+                dx = 0;
+                dy = 0;
+            }
+        }
+
+        if (dx != 0 || dy != 0) {
+            player.tryMoveBy(dx, dy, grid);
+        }
+    }
+
+    private static boolean isHeld(MoveDir dir, boolean leftHeld, boolean rightHeld, boolean upHeld, boolean downHeld) {
+        return switch (dir) {
+            case LEFT -> leftHeld;
+            case RIGHT -> rightHeld;
+            case UP -> upHeld;
+            case DOWN -> downHeld;
+        };
     }
 
     @Override
