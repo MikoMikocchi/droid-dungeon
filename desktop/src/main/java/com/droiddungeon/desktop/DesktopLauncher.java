@@ -12,6 +12,7 @@ public class DesktopLauncher {
         config.useVsync(true);
         config.setForegroundFPS(60);
 
-        new Lwjgl3Application(new DroidDungeonGame(), config);
+        @SuppressWarnings("unused")
+        Lwjgl3Application app = new Lwjgl3Application(new DroidDungeonGame(), config);
     }
 }

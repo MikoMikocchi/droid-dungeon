@@ -1,5 +1,7 @@
 package com.droiddungeon.render;
 
+import java.util.List;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -13,15 +15,12 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-
-import java.util.List;
 
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -30,6 +29,8 @@ public final class WorldRenderer {
     private final GlyphLayout glyphLayout = new GlyphLayout();
     private final Texture whiteTexture;
     private final TextureRegion whiteRegion;
+    private final Texture playerTexture;
+    private final TextureRegion playerRegion;
 
     public WorldRenderer() {
         font = loadFont();
@@ -43,6 +44,10 @@ public final class WorldRenderer {
         whiteTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
         whiteRegion = new TextureRegion(whiteTexture);
         pixmap.dispose();
+
+        playerTexture = new Texture(Gdx.files.internal("characters/player.png"));
+        playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        playerRegion = new TextureRegion(playerTexture);
     }
 
     public void render(Stage stage, Grid grid, Player player, List<GroundItem> groundItems, ItemRegistry itemRegistry) {
@@ -131,12 +136,14 @@ public final class WorldRenderer {
     private void renderPlayer(Player player, float gridOriginX, float gridOriginY, float tileSize) {
         float centerX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
         float centerY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
-        float radius = tileSize * 0.42f;
+        float drawSize = tileSize * 0.9f;
+        float drawX = centerX - drawSize * 0.5f;
+        float drawY = centerY - drawSize * 0.5f;
 
-        shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(0.15f, 0.75f, 1f, 1f);
-        shapeRenderer.circle(centerX, centerY, radius, MathUtils.clamp((int) (radius * 2.5f), 16, 64));
-        shapeRenderer.end();
+        spriteBatch.begin();
+        spriteBatch.setColor(Color.WHITE);
+        spriteBatch.draw(playerRegion, drawX, drawY, drawSize, drawSize);
+        spriteBatch.end();
     }
 
     public void dispose() {
@@ -144,6 +151,7 @@ public final class WorldRenderer {
         spriteBatch.dispose();
         font.dispose();
         whiteTexture.dispose();
+        playerTexture.dispose();
     }
 
     private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {
