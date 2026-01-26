@@ -31,6 +31,8 @@ public final class WorldRenderer {
     private final TextureRegion whiteRegion;
     private final Texture playerTexture;
     private final TextureRegion playerRegion;
+    private final Texture doroTexture;
+    private final TextureRegion doroRegion;
 
     public WorldRenderer() {
         font = loadFont();
@@ -45,9 +47,13 @@ public final class WorldRenderer {
         whiteRegion = new TextureRegion(whiteTexture);
         pixmap.dispose();
 
-        playerTexture = new Texture(Gdx.files.internal("characters/player.png"));
+        playerTexture = new Texture(Gdx.files.internal("characters/Player.png"));
         playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
         playerRegion = new TextureRegion(playerTexture);
+
+        doroTexture = new Texture(Gdx.files.internal("characters/Doro.png"));
+        doroTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+        doroRegion = new TextureRegion(doroTexture);
     }
 
     public void render(Stage stage, Grid grid, Player player, List<GroundItem> groundItems, ItemRegistry itemRegistry) {
@@ -62,7 +68,28 @@ public final class WorldRenderer {
         renderTileFill(grid, gridOriginX, gridOriginY, tileSize);
         renderGridLines(grid, gridOriginX, gridOriginY, tileSize);
         renderGroundItems(groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
+        renderCompanionDoro(grid, gridOriginX, gridOriginY, tileSize);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
+    }
+
+    private void renderCompanionDoro(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
+        if (grid.getColumns() <= 0 || grid.getRows() <= 0) {
+            return;
+        }
+
+        int gridX = Math.min(1, grid.getColumns() - 1);
+        int gridY = Math.min(1, grid.getRows() - 1);
+
+        float centerX = gridOriginX + (gridX + 0.5f) * tileSize;
+        float centerY = gridOriginY + (gridY + 0.5f) * tileSize;
+        float drawSize = tileSize * 0.9f;
+        float drawX = centerX - drawSize * 0.5f;
+        float drawY = centerY - drawSize * 0.5f;
+
+        spriteBatch.begin();
+        spriteBatch.setColor(Color.WHITE);
+        spriteBatch.draw(doroRegion, drawX, drawY, drawSize, drawSize);
+        spriteBatch.end();
     }
 
     private void renderTileFill(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
@@ -152,6 +179,7 @@ public final class WorldRenderer {
         font.dispose();
         whiteTexture.dispose();
         playerTexture.dispose();
+        doroTexture.dispose();
     }
 
     private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {
