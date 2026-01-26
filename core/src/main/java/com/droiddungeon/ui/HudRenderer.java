@@ -59,7 +59,8 @@ public final class HudRenderer {
             boolean inventoryOpen,
             int selectedSlotIndex,
             int hoveredSlotIndex,
-            float deltaSeconds
+            float deltaSeconds,
+            String debugText
     ) {
         stage.getViewport().apply();
         shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
@@ -75,6 +76,7 @@ public final class HudRenderer {
         renderSlotContents(inventory, itemRegistry);
         renderTooltip(stage, inventory, itemRegistry, hoveredSlotIndex);
         renderCursorStack(stage, itemRegistry, cursorStack);
+        renderDebugBox(stage, debugText);
     }
 
     private void cacheLayout(Stage stage, boolean inventoryOpen) {
@@ -277,6 +279,40 @@ public final class HudRenderer {
 
         font.setColor(Color.WHITE);
         font.draw(batch, text, Math.round(x), Math.round(y));
+    }
+
+    private void renderDebugBox(Stage stage, String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        glyphLayout.setText(font, text);
+
+        float paddingX = 8f;
+        float paddingY = 6f;
+        float margin = 10f;
+        float boxWidth = glyphLayout.width + paddingX * 2f;
+        float boxHeight = glyphLayout.height + paddingY * 2f;
+
+        float x = margin;
+        float y = stage.getViewport().getWorldHeight() - margin - boxHeight;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
+        shapeRenderer.rect(x, y, boxWidth, boxHeight);
+        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
+        shapeRenderer.rect(x, y, boxWidth, 2f);
+        shapeRenderer.rect(x, y, 2f, boxHeight);
+        shapeRenderer.rect(x + boxWidth - 2f, y, 2f, boxHeight);
+        shapeRenderer.rect(x, y + boxHeight - 2f, boxWidth, 2f);
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+
+        spriteBatch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, x + paddingX, y + paddingY + glyphLayout.height);
+        spriteBatch.end();
     }
 
     private BitmapFont loadFont() {

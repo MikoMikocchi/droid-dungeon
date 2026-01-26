@@ -69,7 +69,7 @@ public final class Player {
     }
 
     public void moveTo(int x, int y, Grid grid) {
-        if (!grid.isInside(x, y)) {
+        if (!grid.isWalkable(x, y)) {
             return;
         }
         this.gridX = x;

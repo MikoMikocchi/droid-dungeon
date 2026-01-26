@@ -4,25 +4,35 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
+import com.badlogic.gdx.utils.TimeUtils;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.ui.HudRenderer;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 
 public class DroidDungeonGame extends ApplicationAdapter {
     private Stage stage;
+    private Viewport worldViewport;
+    private OrthographicCamera worldCamera;
     private WorldRenderer worldRenderer;
     private HudRenderer hudRenderer;
     private HeldMovementController movementController;
@@ -37,13 +47,42 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private int selectedSlotIndex;
     private List<GroundItem> groundItems;
 
+    private float cameraLerp = 6f;
+    private float cameraZoom = 1.25f;
+    private int companionGridX;
+    private int companionGridY;
+    private float companionRenderX;
+    private float companionRenderY;
+    private final int companionDelayTiles = 3;
+    private float companionSpeedTilesPerSecond = 12f;
+    private final Deque<int[]> followerTrail = new ArrayDeque<>();
+    private int lastPlayerGridX;
+    private int lastPlayerGridY;
+
     @Override
     public void create() {
-        stage = new Stage(new ScreenViewport());
+        stage = new Stage(new ScreenViewport()); // UI stage
+        worldCamera = new OrthographicCamera();
+        worldViewport = new ScreenViewport(worldCamera);
 
-        grid = new Grid(20, 12, 48f);
-        seedDemoTerrain();
-        player = new Player(grid.getColumns() / 2, grid.getRows() / 2);
+        long seed = TimeUtils.millis();
+        int columns = 80;
+        int rows = 60;
+        float tileSize = 48f;
+        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generate(columns, rows, tileSize, seed);
+        grid = layout.grid();
+        player = new Player(layout.spawnX(), layout.spawnY());
+        companionGridX = player.getGridX();
+        companionGridY = player.getGridY();
+        companionRenderX = companionGridX;
+        companionRenderY = companionGridY;
+        lastPlayerGridX = player.getGridX();
+        lastPlayerGridY = player.getGridY();
+        // Seed the trail so Doro starts behind after a few steps.
+        followerTrail.clear();
+        for (int i = 0; i < companionDelayTiles; i++) {
+            followerTrail.addLast(new int[]{companionGridX, companionGridY});
+        }
 
         worldRenderer = new WorldRenderer();
         hudRenderer = new HudRenderer();
@@ -64,6 +103,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
+        worldViewport.update(width, height, true);
     }
 
     @Override
@@ -109,12 +149,17 @@ public class DroidDungeonGame extends ApplicationAdapter {
         if (!inventoryOpen) {
             movementController.update(grid, player);
         }
+        updateFollowerTrail();
         player.update(delta, 10f);
+        updateCompanionRender(delta);
 
-        worldRenderer.render(stage, grid, player, groundItems, itemRegistry);
-        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta);
+        float gridOriginX = (worldViewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
+        float gridOriginY = (worldViewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
+        updateCamera(delta, gridOriginX, gridOriginY);
 
-        stage.draw();
+        worldRenderer.render(worldViewport, grid, player, groundItems, itemRegistry, companionRenderX, companionRenderY);
+        String debugText = buildDebugText(gridOriginX, gridOriginY);
+        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText);
     }
 
     @Override
@@ -123,48 +168,6 @@ public class DroidDungeonGame extends ApplicationAdapter {
         worldRenderer.dispose();
         hudRenderer.dispose();
         itemRegistry.dispose();
-    }
-
-    private void seedDemoTerrain() {
-        grid.fill(TileMaterial.DIRT);
-
-        int lastColumn = grid.getColumns() - 1;
-        int lastRow = grid.getRows() - 1;
-
-        for (int x = 0; x <= lastColumn; x++) {
-            grid.setTileMaterial(x, 0, TileMaterial.STONE);
-            grid.setTileMaterial(x, lastRow, TileMaterial.STONE);
-        }
-        for (int y = 0; y <= lastRow; y++) {
-            grid.setTileMaterial(0, y, TileMaterial.STONE);
-            grid.setTileMaterial(lastColumn, y, TileMaterial.STONE);
-        }
-
-        int hallY = grid.getRows() / 2;
-        for (int x = 1; x < lastColumn; x++) {
-            grid.setTileMaterial(x, hallY, TileMaterial.PLANKS);
-        }
-
-        int gravelStartY = Math.max(1, hallY - 3);
-        int gravelStartX = Math.min(2, lastColumn);
-        int gravelEndX = Math.max(gravelStartX, lastColumn - 2);
-        for (int y = gravelStartY; y < hallY; y++) {
-            for (int x = gravelStartX; x <= gravelEndX; x++) {
-                grid.setTileMaterial(x, y, TileMaterial.GRAVEL);
-            }
-        }
-
-        int woodStartX = Math.min(2, lastColumn);
-        int woodStartY = Math.min(Math.max(1, hallY + 1), lastRow);
-        int woodEndX = Math.min(woodStartX + 3, lastColumn);
-        int woodEndY = Math.min(woodStartY + 2, lastRow);
-        if (woodStartX <= woodEndX && woodStartY <= woodEndY) {
-            for (int y = woodStartY; y <= woodEndY; y++) {
-                for (int x = woodStartX; x <= woodEndX; x++) {
-                    grid.setTileMaterial(x, y, TileMaterial.WOOD);
-                }
-            }
-        }
     }
 
     private void seedDemoItems() {
@@ -326,5 +329,108 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         inventory.set(slotIndex, cursorStack);
         cursorStack = slotStack;
+    }
+
+    private void updateCamera(float deltaSeconds, float gridOriginX, float gridOriginY) {
+        OrthographicCamera camera = worldCamera;
+        float tileSize = grid.getTileSize();
+        float targetX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
+        float targetY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
+
+        float lerp = 1f - (float) Math.exp(-cameraLerp * deltaSeconds);
+        camera.position.x += (targetX - camera.position.x) * lerp;
+        camera.position.y += (targetY - camera.position.y) * lerp;
+        camera.zoom = cameraZoom;
+        camera.update();
+    }
+
+    private void updateFollowerTrail() {
+        int px = player.getGridX();
+        int py = player.getGridY();
+        if (px != lastPlayerGridX || py != lastPlayerGridY) {
+            followerTrail.addLast(new int[]{px, py});
+            while (followerTrail.size() > companionDelayTiles) {
+                int[] next = followerTrail.removeFirst();
+                companionGridX = next[0];
+                companionGridY = next[1];
+            }
+            lastPlayerGridX = px;
+            lastPlayerGridY = py;
+        }
+    }
+
+    private void updateCompanionRender(float deltaSeconds) {
+        float targetX = companionGridX;
+        float targetY = companionGridY;
+        float dx = targetX - companionRenderX;
+        float dy = targetY - companionRenderY;
+        float dist2 = dx * dx + dy * dy;
+        if (dist2 < 0.000001f || deltaSeconds <= 0f) {
+            companionRenderX = targetX;
+            companionRenderY = targetY;
+            return;
+        }
+        float dist = (float) Math.sqrt(dist2);
+        float step = companionSpeedTilesPerSecond * deltaSeconds;
+        if (step >= dist) {
+            companionRenderX = targetX;
+            companionRenderY = targetY;
+            return;
+        }
+        companionRenderX += (dx / dist) * step;
+        companionRenderY += (dy / dist) * step;
+    }
+
+    private String buildDebugText(float gridOriginX, float gridOriginY) {
+        float tileSize = grid.getTileSize();
+        Vector2 world = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        float localX = world.x - gridOriginX;
+        float localY = world.y - gridOriginY;
+
+        int tileX = (int) Math.floor(localX / tileSize);
+        int tileY = (int) Math.floor(localY / tileSize);
+
+        StringBuilder text = new StringBuilder();
+        if (grid.isInside(tileX, tileY)) {
+            TileMaterial material = grid.getTileMaterial(tileX, tileY);
+            text.append("Tile ").append(tileX).append(", ").append(tileY)
+                    .append(" — ").append(material.displayName());
+
+            boolean hasEntities = false;
+            if (player.getGridX() == tileX && player.getGridY() == tileY) {
+                text.append("\nEntity: Player");
+                hasEntities = true;
+            }
+
+            int doroX = companionGridX;
+            int doroY = companionGridY;
+            if (doroX == tileX && doroY == tileY) {
+                text.append(hasEntities ? ", " : "\nEntity: ").append("Doro");
+                hasEntities = true;
+            }
+
+            if (groundItems != null) {
+                for (GroundItem groundItem : groundItems) {
+                    if (groundItem.isAt(tileX, tileY)) {
+                        ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
+                        String name = def != null ? def.displayName() : groundItem.getStack().itemId();
+                        int count = groundItem.getStack().count();
+                        text.append(hasEntities ? ", " : "\nEntity: ");
+                        text.append(name);
+                        if (count > 1) {
+                            text.append(" x").append(count);
+                        }
+                        hasEntities = true;
+                    }
+                }
+            }
+
+            if (!hasEntities) {
+                text.append("\nEntity: —");
+            }
+        } else {
+            text.append("Cursor: out of bounds");
+        }
+        return text.toString();
     }
 }

@@ -15,8 +15,7 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
@@ -58,33 +57,34 @@ public final class WorldRenderer {
         doroRegion = new TextureRegion(doroTexture);
     }
 
-    public void render(Stage stage, Grid grid, Player player, List<GroundItem> groundItems, ItemRegistry itemRegistry) {
-        stage.getViewport().apply();
-        shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
-        spriteBatch.setProjectionMatrix(stage.getCamera().combined);
+    public void render(
+            Viewport viewport,
+            Grid grid,
+            Player player,
+            List<GroundItem> groundItems,
+            ItemRegistry itemRegistry,
+            float companionX,
+            float companionY
+    ) {
+        // Keep the camera position set by the game (no recentering) while ensuring GL viewport is correct.
+        viewport.apply(false);
+        shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
+        spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        float gridOriginX = (stage.getViewport().getWorldWidth() - grid.getWorldWidth()) * 0.5f;
-        float gridOriginY = (stage.getViewport().getWorldHeight() - grid.getWorldHeight()) * 0.5f;
+        float gridOriginX = (viewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
+        float gridOriginY = (viewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
         float tileSize = grid.getTileSize();
 
         renderTileFill(grid, gridOriginX, gridOriginY, tileSize);
         renderGridLines(grid, gridOriginX, gridOriginY, tileSize);
         renderGroundItems(groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
-        renderCompanionDoro(grid, gridOriginX, gridOriginY, tileSize);
+        renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
-        renderDebugHover(stage, grid, player, groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
     }
 
-    private void renderCompanionDoro(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
-        if (grid.getColumns() <= 0 || grid.getRows() <= 0) {
-            return;
-        }
-
-        int gridX = Math.min(1, grid.getColumns() - 1);
-        int gridY = Math.min(1, grid.getRows() - 1);
-
-        float centerX = gridOriginX + (gridX + 0.5f) * tileSize;
-        float centerY = gridOriginY + (gridY + 0.5f) * tileSize;
+    private void renderCompanionDoro(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {
+        float centerX = gridOriginX + (companionX + 0.5f) * tileSize;
+        float centerY = gridOriginY + (companionY + 0.5f) * tileSize;
         float drawSize = tileSize * 0.9f;
         float drawX = centerX - drawSize * 0.5f;
         float drawY = centerY - drawSize * 0.5f;
@@ -170,82 +170,6 @@ public final class WorldRenderer {
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
         spriteBatch.draw(playerRegion, drawX, drawY, drawSize, drawSize);
-        spriteBatch.end();
-    }
-
-    private void renderDebugHover(
-            Stage stage,
-            Grid grid,
-            Player player,
-            List<GroundItem> groundItems,
-            ItemRegistry itemRegistry,
-            float gridOriginX,
-            float gridOriginY,
-            float tileSize
-    ) {
-        Vector2 world = stage.getViewport().unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
-        float localX = world.x - gridOriginX;
-        float localY = world.y - gridOriginY;
-
-        int tileX = (int) Math.floor(localX / tileSize);
-        int tileY = (int) Math.floor(localY / tileSize);
-
-        StringBuilder text = new StringBuilder();
-        if (grid.isInside(tileX, tileY)) {
-            TileMaterial material = grid.getTileMaterial(tileX, tileY);
-            text.append("Tile ").append(tileX).append(", ").append(tileY)
-                    .append(" — ").append(material.displayName());
-
-            boolean hasEntities = false;
-            if (player.getGridX() == tileX && player.getGridY() == tileY) {
-                text.append("\nEntity: Player");
-                hasEntities = true;
-            }
-
-            int companionX = Math.min(1, grid.getColumns() - 1);
-            int companionY = Math.min(1, grid.getRows() - 1);
-            if (companionX == tileX && companionY == tileY) {
-                text.append(hasEntities ? ", " : "\nEntity: ").append("Doro");
-                hasEntities = true;
-            }
-
-            if (groundItems != null) {
-                for (GroundItem groundItem : groundItems) {
-                    if (groundItem.isAt(tileX, tileY)) {
-                        ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
-                        String name = def != null ? def.displayName() : groundItem.getStack().itemId();
-                        int count = groundItem.getStack().count();
-                        text.append(hasEntities ? ", " : "\nEntity: ");
-                        text.append(name);
-                        if (count > 1) {
-                            text.append(" x").append(count);
-                        }
-                        hasEntities = true;
-                    }
-                }
-            }
-
-            if (!hasEntities) {
-                text.append("\nEntity: —");
-            }
-        } else {
-            text.append("Cursor: out of bounds");
-        }
-
-        glyphLayout.setText(font, text);
-        float paddingX = 6f;
-        float paddingY = 4f;
-        float boxX = gridOriginX + 8f;
-        float boxY = gridOriginY + grid.getWorldHeight() + 6f;
-        float boxWidth = glyphLayout.width + paddingX * 2f;
-        float boxHeight = glyphLayout.height + paddingY * 2f;
-
-        spriteBatch.begin();
-        spriteBatch.setColor(0f, 0f, 0f, 0.55f);
-        spriteBatch.draw(whiteRegion, boxX, boxY, boxWidth, boxHeight);
-        spriteBatch.setColor(Color.WHITE);
-        font.setColor(Color.WHITE);
-        font.draw(spriteBatch, glyphLayout, boxX + paddingX, boxY + paddingY + glyphLayout.height);
         spriteBatch.end();
     }
 

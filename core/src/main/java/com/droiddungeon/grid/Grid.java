@@ -49,6 +49,13 @@ public final class Grid {
         return x >= 0 && x < columns && y >= 0 && y < rows;
     }
 
+    public boolean isWalkable(int x, int y) {
+        if (!isInside(x, y)) {
+            return false;
+        }
+        return tileMaterials[x][y].isWalkable();
+    }
+
     public TileMaterial getTileMaterial(int x, int y) {
         ensureInside(x, y);
         return tileMaterials[x][y];
