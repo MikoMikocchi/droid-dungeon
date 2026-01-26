@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
@@ -41,6 +42,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         stage = new Stage(new ScreenViewport());
 
         grid = new Grid(20, 12, 48f);
+        seedDemoTerrain();
         player = new Player(grid.getColumns() / 2, grid.getRows() / 2);
 
         worldRenderer = new WorldRenderer();
@@ -121,6 +123,48 @@ public class DroidDungeonGame extends ApplicationAdapter {
         worldRenderer.dispose();
         hudRenderer.dispose();
         itemRegistry.dispose();
+    }
+
+    private void seedDemoTerrain() {
+        grid.fill(TileMaterial.DIRT);
+
+        int lastColumn = grid.getColumns() - 1;
+        int lastRow = grid.getRows() - 1;
+
+        for (int x = 0; x <= lastColumn; x++) {
+            grid.setTileMaterial(x, 0, TileMaterial.STONE);
+            grid.setTileMaterial(x, lastRow, TileMaterial.STONE);
+        }
+        for (int y = 0; y <= lastRow; y++) {
+            grid.setTileMaterial(0, y, TileMaterial.STONE);
+            grid.setTileMaterial(lastColumn, y, TileMaterial.STONE);
+        }
+
+        int hallY = grid.getRows() / 2;
+        for (int x = 1; x < lastColumn; x++) {
+            grid.setTileMaterial(x, hallY, TileMaterial.PLANKS);
+        }
+
+        int gravelStartY = Math.max(1, hallY - 3);
+        int gravelStartX = Math.min(2, lastColumn);
+        int gravelEndX = Math.max(gravelStartX, lastColumn - 2);
+        for (int y = gravelStartY; y < hallY; y++) {
+            for (int x = gravelStartX; x <= gravelEndX; x++) {
+                grid.setTileMaterial(x, y, TileMaterial.GRAVEL);
+            }
+        }
+
+        int woodStartX = Math.min(2, lastColumn);
+        int woodStartY = Math.min(Math.max(1, hallY + 1), lastRow);
+        int woodEndX = Math.min(woodStartX + 3, lastColumn);
+        int woodEndY = Math.min(woodStartY + 2, lastRow);
+        if (woodStartX <= woodEndX && woodStartY <= woodEndY) {
+            for (int y = woodStartY; y <= woodEndY; y++) {
+                for (int x = woodStartX; x <= woodEndX; x++) {
+                    grid.setTileMaterial(x, y, TileMaterial.WOOD);
+                }
+            }
+        }
     }
 
     private void seedDemoItems() {

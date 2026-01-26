@@ -15,9 +15,11 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
@@ -70,6 +72,7 @@ public final class WorldRenderer {
         renderGroundItems(groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
         renderCompanionDoro(grid, gridOriginX, gridOriginY, tileSize);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
+        renderDebugHover(stage, grid, player, groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
     }
 
     private void renderCompanionDoro(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
@@ -96,11 +99,8 @@ public final class WorldRenderer {
         shapeRenderer.begin(ShapeType.Filled);
         for (int y = 0; y < grid.getRows(); y++) {
             for (int x = 0; x < grid.getColumns(); x++) {
-                if (((x + y) & 1) == 0) {
-                    shapeRenderer.setColor(0.06f, 0.06f, 0.07f, 1f);
-                } else {
-                    shapeRenderer.setColor(0.04f, 0.04f, 0.05f, 1f);
-                }
+                TileMaterial material = grid.getTileMaterial(x, y);
+                shapeRenderer.setColor(material.lightColor());
                 shapeRenderer.rect(
                         gridOriginX + x * tileSize,
                         gridOriginY + y * tileSize,
@@ -170,6 +170,82 @@ public final class WorldRenderer {
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
         spriteBatch.draw(playerRegion, drawX, drawY, drawSize, drawSize);
+        spriteBatch.end();
+    }
+
+    private void renderDebugHover(
+            Stage stage,
+            Grid grid,
+            Player player,
+            List<GroundItem> groundItems,
+            ItemRegistry itemRegistry,
+            float gridOriginX,
+            float gridOriginY,
+            float tileSize
+    ) {
+        Vector2 world = stage.getViewport().unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        float localX = world.x - gridOriginX;
+        float localY = world.y - gridOriginY;
+
+        int tileX = (int) Math.floor(localX / tileSize);
+        int tileY = (int) Math.floor(localY / tileSize);
+
+        StringBuilder text = new StringBuilder();
+        if (grid.isInside(tileX, tileY)) {
+            TileMaterial material = grid.getTileMaterial(tileX, tileY);
+            text.append("Tile ").append(tileX).append(", ").append(tileY)
+                    .append(" — ").append(material.displayName());
+
+            boolean hasEntities = false;
+            if (player.getGridX() == tileX && player.getGridY() == tileY) {
+                text.append("\nEntity: Player");
+                hasEntities = true;
+            }
+
+            int companionX = Math.min(1, grid.getColumns() - 1);
+            int companionY = Math.min(1, grid.getRows() - 1);
+            if (companionX == tileX && companionY == tileY) {
+                text.append(hasEntities ? ", " : "\nEntity: ").append("Doro");
+                hasEntities = true;
+            }
+
+            if (groundItems != null) {
+                for (GroundItem groundItem : groundItems) {
+                    if (groundItem.isAt(tileX, tileY)) {
+                        ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
+                        String name = def != null ? def.displayName() : groundItem.getStack().itemId();
+                        int count = groundItem.getStack().count();
+                        text.append(hasEntities ? ", " : "\nEntity: ");
+                        text.append(name);
+                        if (count > 1) {
+                            text.append(" x").append(count);
+                        }
+                        hasEntities = true;
+                    }
+                }
+            }
+
+            if (!hasEntities) {
+                text.append("\nEntity: —");
+            }
+        } else {
+            text.append("Cursor: out of bounds");
+        }
+
+        glyphLayout.setText(font, text);
+        float paddingX = 6f;
+        float paddingY = 4f;
+        float boxX = gridOriginX + 8f;
+        float boxY = gridOriginY + grid.getWorldHeight() + 6f;
+        float boxWidth = glyphLayout.width + paddingX * 2f;
+        float boxHeight = glyphLayout.height + paddingY * 2f;
+
+        spriteBatch.begin();
+        spriteBatch.setColor(0f, 0f, 0f, 0.55f);
+        spriteBatch.draw(whiteRegion, boxX, boxY, boxWidth, boxHeight);
+        spriteBatch.setColor(Color.WHITE);
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, boxX + paddingX, boxY + paddingY + glyphLayout.height);
         spriteBatch.end();
     }
 
