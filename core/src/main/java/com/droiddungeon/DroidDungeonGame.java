@@ -1,9 +1,5 @@
 package com.droiddungeon;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -27,6 +23,7 @@ import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.systems.CompanionSystem;
+import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.ui.HudRenderer;
 
 public class DroidDungeonGame extends ApplicationAdapter {
@@ -42,10 +39,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     private Inventory inventory;
     private ItemRegistry itemRegistry;
-    private ItemStack cursorStack;
-    private boolean inventoryOpen;
-    private int selectedSlotIndex;
-    private List<GroundItem> groundItems;
+    private InventorySystem inventorySystem;
 
     private final float cameraLerp = 6f;
     private final float cameraZoom = 1f;
@@ -72,10 +66,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
-        cursorStack = null;
-        inventoryOpen = false;
-        selectedSlotIndex = 0;
-        groundItems = new ArrayList<>();
+        inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
         seedDemoItems();
 
         // Input is handled by polling (for held-key movement)
@@ -92,42 +83,30 @@ public class DroidDungeonGame extends ApplicationAdapter {
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-            inventoryOpen = !inventoryOpen;
-            if (!inventoryOpen && selectedSlotIndex >= Inventory.HOTBAR_SLOTS) {
-                selectedSlotIndex %= Inventory.HOTBAR_SLOTS;
-            }
-        }
-
+        inventorySystem.updateInput();
         if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
-            dropCurrentStack();
+            inventorySystem.dropCurrentStack(player);
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
-            pickUpItemsAtPlayer();
-        }
-
-        int hotbarKeySlot = pollHotbarNumberKey();
-        if (hotbarKeySlot != -1) {
-            selectedSlotIndex = hotbarKeySlot;
+            inventorySystem.pickUpItemsAtPlayer(player);
         }
 
         float delta = Gdx.graphics.getDeltaTime();
         stage.act(delta);
 
         int hoveredSlot = -1;
-        if (inventoryOpen) {
+        if (inventorySystem.isInventoryOpen()) {
             hoveredSlot = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), true);
         }
 
         if (Gdx.input.justTouched()) {
-            int clicked = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), inventoryOpen);
+            int clicked = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
             if (clicked != -1) {
-                selectedSlotIndex = clicked;
-                handleSlotClick(clicked);
+                inventorySystem.onSlotClicked(clicked);
             }
         }
 
-        if (!inventoryOpen) {
+        if (!inventorySystem.isInventoryOpen()) {
             movementController.update(grid, player);
         }
         companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
@@ -138,9 +117,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
         float gridOriginY = (worldViewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
         updateCamera(delta, gridOriginX, gridOriginY);
 
-        worldRenderer.render(worldViewport, grid, player, groundItems, itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
+        worldRenderer.render(worldViewport, grid, player, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY());
+        hudRenderer.render(stage, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, debugText, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY());
     }
 
     @Override
@@ -156,159 +135,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         inventory.add(new ItemStack("test_chip", 8), itemRegistry);
         int dropX = Math.min(grid.getColumns() - 1, player.getGridX() + 1);
         int dropY = player.getGridY();
-        addGroundStack(dropX, dropY, new ItemStack("test_chip", 5));
-    }
-
-    private static int pollHotbarNumberKey() {
-        // 1..9 -> slots 0..8, 0 -> slot 9.
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_1)) return 0;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_2) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_2)) return 1;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_3) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_3)) return 2;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_4) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_4)) return 3;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_5) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_5)) return 4;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_6) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_6)) return 5;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_7) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_7)) return 6;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_8) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_8)) return 7;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_9) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_9)) return 8;
-        if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0) || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_0)) return 9;
-        return -1;
-    }
-
-    private void dropCurrentStack() {
-        ItemStack toDrop = cursorStack;
-        boolean fromCursor = true;
-        if (toDrop == null) {
-            toDrop = inventory.get(selectedSlotIndex);
-            fromCursor = false;
-        }
-        if (toDrop == null) {
-            return;
-        }
-        addGroundStack(player.getGridX(), player.getGridY(), toDrop);
-        if (fromCursor) {
-            cursorStack = null;
-        } else {
-            inventory.set(selectedSlotIndex, null);
-        }
-    }
-
-    private void pickUpItemsAtPlayer() {
-        int playerX = player.getGridX();
-        int playerY = player.getGridY();
-        Iterator<GroundItem> iterator = groundItems.iterator();
-        while (iterator.hasNext()) {
-            GroundItem groundItem = iterator.next();
-            if (!groundItem.isAt(playerX, playerY)) {
-                continue;
-            }
-            ItemStack stack = groundItem.getStack();
-            ItemStack remaining = mergeIntoCursor(stack);
-            if (remaining != null) {
-                remaining = inventory.add(remaining, itemRegistry);
-            }
-            if (remaining == null) {
-                iterator.remove();
-            } else if (remaining.count() != stack.count()) {
-                groundItem.setStack(remaining);
-            }
-        }
-    }
-
-    private ItemStack mergeIntoCursor(ItemStack stack) {
-        if (cursorStack == null) {
-            return stack;
-        }
-        if (!cursorStack.itemId().equals(stack.itemId())) {
-            return stack;
-        }
-        int max = itemRegistry.maxStackSize(cursorStack.itemId());
-        int space = max - cursorStack.count();
-        if (space <= 0) {
-            return stack;
-        }
-        int toMove = Math.min(space, stack.count());
-        cursorStack = cursorStack.withCount(cursorStack.count() + toMove);
-        if (toMove == stack.count()) {
-            return null;
-        }
-        return stack.withCount(stack.count() - toMove);
-    }
-
-    private void addGroundStack(int gridX, int gridY, ItemStack stack) {
-        if (stack == null) {
-            return;
-        }
-        if (!grid.isInside(gridX, gridY)) {
-            return;
-        }
-        int maxStack = itemRegistry.maxStackSize(stack.itemId());
-        ItemStack remaining = stack;
-
-        for (GroundItem groundItem : groundItems) {
-            if (!groundItem.isAt(gridX, gridY)) {
-                continue;
-            }
-            if (!groundItem.getStack().itemId().equals(remaining.itemId())) {
-                continue;
-            }
-            int space = maxStack - groundItem.getStack().count();
-            if (space <= 0) {
-                continue;
-            }
-            int toMove = Math.min(space, remaining.count());
-            groundItem.setStack(groundItem.getStack().withCount(groundItem.getStack().count() + toMove));
-            if (toMove == remaining.count()) {
-                remaining = null;
-                break;
-            }
-            remaining = remaining.withCount(remaining.count() - toMove);
-        }
-
-        while (remaining != null) {
-            int chunk = Math.min(remaining.count(), maxStack);
-            groundItems.add(new GroundItem(gridX, gridY, new ItemStack(remaining.itemId(), chunk)));
-            if (remaining.count() <= maxStack) {
-                remaining = null;
-            } else {
-                remaining = remaining.withCount(remaining.count() - chunk);
-            }
-        }
-    }
-
-    private void handleSlotClick(int slotIndex) {
-        ItemStack slotStack = inventory.get(slotIndex);
-
-        if (cursorStack == null) {
-            if (slotStack != null) {
-                cursorStack = slotStack;
-                inventory.set(slotIndex, null);
-            }
-            return;
-        }
-
-        if (slotStack == null) {
-            inventory.set(slotIndex, cursorStack);
-            cursorStack = null;
-            return;
-        }
-
-        if (slotStack.itemId().equals(cursorStack.itemId())) {
-            int maxStack = itemRegistry.maxStackSize(slotStack.itemId());
-            int space = maxStack - slotStack.count();
-            if (space > 0) {
-                int toTransfer = Math.min(space, cursorStack.count());
-                inventory.set(slotIndex, slotStack.withCount(slotStack.count() + toTransfer));
-                if (toTransfer == cursorStack.count()) {
-                    cursorStack = null;
-                } else {
-                    cursorStack = cursorStack.withCount(cursorStack.count() - toTransfer);
-                }
-                return;
-            }
-        }
-
-        inventory.set(slotIndex, cursorStack);
-        cursorStack = slotStack;
+        inventorySystem.addGroundStack(dropX, dropY, new ItemStack("test_chip", 5));
     }
 
     private void updateCamera(float deltaSeconds, float gridOriginX, float gridOriginY) {
@@ -352,19 +179,17 @@ public class DroidDungeonGame extends ApplicationAdapter {
                 hasEntities = true;
             }
 
-            if (groundItems != null) {
-                for (GroundItem groundItem : groundItems) {
-                    if (groundItem.isAt(tileX, tileY)) {
-                        ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
-                        String name = def != null ? def.displayName() : groundItem.getStack().itemId();
-                        int count = groundItem.getStack().count();
-                        text.append(hasEntities ? ", " : "\nEntity: ");
-                        text.append(name);
-                        if (count > 1) {
-                            text.append(" x").append(count);
-                        }
-                        hasEntities = true;
+            for (GroundItem groundItem : inventorySystem.getGroundItems()) {
+                if (groundItem.isAt(tileX, tileY)) {
+                    ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
+                    String name = def != null ? def.displayName() : groundItem.getStack().itemId();
+                    int count = groundItem.getStack().count();
+                    text.append(hasEntities ? ", " : "\nEntity: ");
+                    text.append(name);
+                    if (count > 1) {
+                        text.append(" x").append(count);
                     }
+                    hasEntities = true;
                 }
             }
 
