@@ -26,6 +26,7 @@ import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.ui.HudRenderer;
 
@@ -167,6 +168,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         stage.dispose();
         worldRenderer.dispose();
         hudRenderer.dispose();
+        RenderAssets.dispose();
         itemRegistry.dispose();
     }
 
@@ -228,8 +230,6 @@ public class DroidDungeonGame extends ApplicationAdapter {
                 iterator.remove();
             } else if (remaining.count() != stack.count()) {
                 groundItem.setStack(remaining);
-            } else {
-                break;
             }
         }
     }

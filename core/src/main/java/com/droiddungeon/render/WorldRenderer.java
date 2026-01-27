@@ -4,15 +4,12 @@ import java.util.List;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
-import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -28,7 +25,6 @@ public final class WorldRenderer {
     private final SpriteBatch spriteBatch = new SpriteBatch();
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
-    private final Texture whiteTexture;
     private final TextureRegion whiteRegion;
     private final Texture playerTexture;
     private final TextureRegion playerRegion;
@@ -36,17 +32,8 @@ public final class WorldRenderer {
     private final TextureRegion doroRegion;
 
     public WorldRenderer() {
-        font = loadFont();
-        font.setUseIntegerPositions(true);
-        font.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        whiteTexture = new Texture(pixmap);
-        whiteTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-        whiteRegion = new TextureRegion(whiteTexture);
-        pixmap.dispose();
+        font = RenderAssets.font(13);
+        whiteRegion = RenderAssets.whiteRegion();
 
         playerTexture = new Texture(Gdx.files.internal("characters/Player.png"));
         playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
@@ -76,9 +63,12 @@ public final class WorldRenderer {
 
         renderTileFill(grid, gridOriginX, gridOriginY, tileSize);
         renderGridLines(grid, gridOriginX, gridOriginY, tileSize);
+        spriteBatch.begin();
+        spriteBatch.setColor(Color.WHITE);
         renderGroundItems(groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
         renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
+        spriteBatch.end();
     }
 
     private void renderCompanionDoro(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {
@@ -88,10 +78,7 @@ public final class WorldRenderer {
         float drawX = centerX - drawSize * 0.5f;
         float drawY = centerY - drawSize * 0.5f;
 
-        spriteBatch.begin();
-        spriteBatch.setColor(Color.WHITE);
         spriteBatch.draw(doroRegion, drawX, drawY, drawSize, drawSize);
-        spriteBatch.end();
     }
 
     private void renderTileFill(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
@@ -136,7 +123,6 @@ public final class WorldRenderer {
         if (groundItems == null || groundItems.isEmpty()) {
             return;
         }
-        spriteBatch.begin();
         for (GroundItem groundItem : groundItems) {
             ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
             if (def == null) {
@@ -156,7 +142,6 @@ public final class WorldRenderer {
                 drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
             }
         }
-        spriteBatch.end();
     }
 
     private void renderPlayer(Player player, float gridOriginX, float gridOriginY, float tileSize) {
@@ -166,17 +151,12 @@ public final class WorldRenderer {
         float drawX = centerX - drawSize * 0.5f;
         float drawY = centerY - drawSize * 0.5f;
 
-        spriteBatch.begin();
-        spriteBatch.setColor(Color.WHITE);
         spriteBatch.draw(playerRegion, drawX, drawY, drawSize, drawSize);
-        spriteBatch.end();
     }
 
     public void dispose() {
         shapeRenderer.dispose();
         spriteBatch.dispose();
-        font.dispose();
-        whiteTexture.dispose();
         playerTexture.dispose();
         doroTexture.dispose();
     }
@@ -197,27 +177,5 @@ public final class WorldRenderer {
         font.draw(batch, text, Math.round(x), Math.round(y));
     }
 
-    private BitmapFont loadFont() {
-        FreeTypeFontGenerator generator = null;
-        try {
-            generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/minecraft_font.ttf"));
-            FreeTypeFontParameter params = new FreeTypeFontParameter();
-            params.size = 13;
-            params.borderWidth = 0.9f;
-            params.borderColor = new Color(0f, 0f, 0f, 0.6f);
-            params.minFilter = TextureFilter.Nearest;
-            params.magFilter = TextureFilter.Nearest;
-            params.color = Color.WHITE;
-            return generator.generateFont(params);
-        } catch (Exception e) {
-            Gdx.app.error("WorldRenderer", "Failed to load custom font, falling back to default", e);
-            BitmapFont fallback = new BitmapFont();
-            fallback.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-            return fallback;
-        } finally {
-            if (generator != null) {
-                generator.dispose();
-            }
-        }
-    }
+    
 }

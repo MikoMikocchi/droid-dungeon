@@ -3,15 +3,10 @@ package com.droiddungeon.ui;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
-import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
@@ -22,13 +17,13 @@ import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.render.RenderAssets;
 
 public final class HudRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final SpriteBatch spriteBatch = new SpriteBatch();
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
-    private final Texture whiteTexture;
     private final TextureRegion whiteRegion;
 
     private final float cellSize = 48f;
@@ -39,18 +34,27 @@ public final class HudRenderer {
     private float lastOriginY;
     private int lastRows;
 
-    public HudRenderer() {
-        font = loadFont();
-        font.setUseIntegerPositions(true);
-        font.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+    private boolean tooltipVisible;
+    private String tooltipText;
+    private float tooltipX;
+    private float tooltipY;
+    private float tooltipPaddingX;
+    private float tooltipPaddingY;
+    private float tooltipTextWidth;
+    private float tooltipTextHeight;
 
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        whiteTexture = new Texture(pixmap);
-        whiteTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-        whiteRegion = new TextureRegion(whiteTexture);
-        pixmap.dispose();
+    private boolean debugVisible;
+    private String debugTextCached;
+    private float debugX;
+    private float debugY;
+    private float debugPaddingX;
+    private float debugPaddingY;
+    private float debugTextWidth;
+    private float debugTextHeight;
+
+    public HudRenderer() {
+        font = RenderAssets.font(14);
+        whiteRegion = RenderAssets.whiteRegion();
     }
 
     public void render(
@@ -74,16 +78,17 @@ public final class HudRenderer {
 
         cacheLayout(stage, inventoryOpen);
 
-        if (inventoryOpen) {
-            renderInventoryBackdrop(stage.getViewport().getWorldWidth(), stage.getViewport().getWorldHeight());
-        }
+        updateTooltipData(stage, inventory, itemRegistry, hoveredSlotIndex);
+        updateDebugData(stage, debugText);
 
-        renderSlotGrid(inventory, selectedSlotIndex);
+        renderShapes(stage, inventory, inventoryOpen, selectedSlotIndex, grid, player, companionX, companionY);
+
+        spriteBatch.begin();
         renderSlotContents(inventory, itemRegistry);
-        renderTooltip(stage, inventory, itemRegistry, hoveredSlotIndex);
+        renderTooltipText();
         renderCursorStack(stage, itemRegistry, cursorStack);
-        renderDebugBox(stage, debugText);
-        renderMinimap(stage, grid, player, companionX, companionY);
+        renderDebugText();
+        spriteBatch.end();
     }
 
     private void cacheLayout(Stage stage, boolean inventoryOpen) {
@@ -94,19 +99,43 @@ public final class HudRenderer {
         lastRows = inventoryOpen ? 4 : 1;
     }
 
-    private void renderInventoryBackdrop(float viewportWidth, float viewportHeight) {
+    private void renderShapes(
+            Stage stage,
+            Inventory inventory,
+            boolean inventoryOpen,
+            int selectedSlotIndex,
+            Grid grid,
+            Player player,
+            float companionX,
+            float companionY
+    ) {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
         shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(0.05f, 0.05f, 0.06f, 0.3f);
-        shapeRenderer.rect(0f, 0f, viewportWidth, viewportHeight);
+        if (inventoryOpen) {
+            renderInventoryBackdropFilled(stage.getViewport().getWorldWidth(), stage.getViewport().getWorldHeight());
+        }
+        renderSlotGridFilled(inventory, selectedSlotIndex);
+        renderTooltipBoxFilled();
+        renderDebugBoxFilled();
+        renderMinimapFilled(stage, grid, player, companionX, companionY);
         shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeType.Line);
+        renderSlotGridOutline();
+        renderMinimapOutline(stage, grid, player, companionX, companionY);
+        shapeRenderer.end();
+
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private void renderSlotGrid(Inventory inventory, int selectedSlotIndex) {
-        // Filled cells.
-        shapeRenderer.begin(ShapeType.Filled);
+    private void renderInventoryBackdropFilled(float viewportWidth, float viewportHeight) {
+        shapeRenderer.setColor(0.05f, 0.05f, 0.06f, 0.3f);
+        shapeRenderer.rect(0f, 0f, viewportWidth, viewportHeight);
+    }
+
+    private void renderSlotGridFilled(Inventory inventory, int selectedSlotIndex) {
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
                 float x = lastOriginX + col * (cellSize + gap);
@@ -127,19 +156,6 @@ public final class HudRenderer {
                 shapeRenderer.rect(x, y, cellSize, cellSize);
             }
         }
-        shapeRenderer.end();
-
-        // Outlines.
-        shapeRenderer.begin(ShapeType.Line);
-        shapeRenderer.setColor(0.30f, 0.30f, 0.34f, 1f);
-        for (int row = 0; row < lastRows; row++) {
-            for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
-                float x = lastOriginX + col * (cellSize + gap);
-                float y = lastOriginY + row * (cellSize + gap);
-                shapeRenderer.rect(x, y, cellSize, cellSize);
-            }
-        }
-        shapeRenderer.end();
 
         // Selection highlight.
         if (selectedSlotIndex >= 0 && selectedSlotIndex < Inventory.TOTAL_SLOTS) {
@@ -151,19 +167,27 @@ public final class HudRenderer {
                 float y = lastOriginY + selectedRow * (cellSize + gap);
 
                 float thickness = 3f;
-                shapeRenderer.begin(ShapeType.Filled);
                 shapeRenderer.setColor(1f, 0.84f, 0.35f, 1f);
                 shapeRenderer.rect(x - thickness, y - thickness, cellSize + thickness * 2f, thickness);
                 shapeRenderer.rect(x - thickness, y + cellSize, cellSize + thickness * 2f, thickness);
                 shapeRenderer.rect(x - thickness, y, thickness, cellSize);
                 shapeRenderer.rect(x + cellSize, y, thickness, cellSize);
-                shapeRenderer.end();
+            }
+        }
+    }
+
+    private void renderSlotGridOutline() {
+        shapeRenderer.setColor(0.30f, 0.30f, 0.34f, 1f);
+        for (int row = 0; row < lastRows; row++) {
+            for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
+                float x = lastOriginX + col * (cellSize + gap);
+                float y = lastOriginY + row * (cellSize + gap);
+                shapeRenderer.rect(x, y, cellSize, cellSize);
             }
         }
     }
 
     private void renderSlotContents(Inventory inventory, ItemRegistry itemRegistry) {
-        spriteBatch.begin();
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
                 int slotIndex = row * Inventory.HOTBAR_SLOTS + col;
@@ -189,7 +213,6 @@ public final class HudRenderer {
                 drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
             }
         }
-        spriteBatch.end();
     }
 
     private void renderCursorStack(Stage stage, ItemRegistry registry, ItemStack cursorStack) {
@@ -209,17 +232,18 @@ public final class HudRenderer {
         float drawX = world.x - drawSize * 0.5f;
         float drawY = world.y - drawSize * 0.5f;
 
-        spriteBatch.begin();
         spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
         String countText = Integer.toString(cursorStack.count());
         glyphLayout.setText(font, countText);
         float textX = drawX + drawSize - glyphLayout.width + 2f;
         float textY = drawY + glyphLayout.height + 2f;
         drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
-        spriteBatch.end();
     }
 
-    private void renderTooltip(Stage stage, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
+    private void updateTooltipData(Stage stage, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
+        tooltipVisible = false;
+        tooltipText = null;
+
         if (hoveredSlotIndex < 0 || hoveredSlotIndex >= Inventory.TOTAL_SLOTS) {
             return;
         }
@@ -233,13 +257,15 @@ public final class HudRenderer {
         }
 
         Vector2 world = stage.getViewport().unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
-        String text = def.displayName();
-        glyphLayout.setText(font, text);
+        tooltipText = def.displayName();
+        glyphLayout.setText(font, tooltipText);
 
-        float paddingX = 8f;
-        float paddingY = 6f;
-        float boxWidth = glyphLayout.width + paddingX * 2f;
-        float boxHeight = glyphLayout.height + paddingY * 2f;
+        tooltipPaddingX = 8f;
+        tooltipPaddingY = 6f;
+        tooltipTextWidth = glyphLayout.width;
+        tooltipTextHeight = glyphLayout.height;
+        float boxWidth = tooltipTextWidth + tooltipPaddingX * 2f;
+        float boxHeight = tooltipTextHeight + tooltipPaddingY * 2f;
 
         float x = world.x + 16f;
         float y = world.y + 20f;
@@ -253,23 +279,33 @@ public final class HudRenderer {
             y = viewportHeight - boxHeight - 4f;
         }
 
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(0.05f, 0.05f, 0.08f, 0.9f);
-        shapeRenderer.rect(x, y, boxWidth, boxHeight);
-        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
-        shapeRenderer.rect(x, y, boxWidth, 2f);
-        shapeRenderer.rect(x, y, 2f, boxHeight);
-        shapeRenderer.rect(x + boxWidth - 2f, y, 2f, boxHeight);
-        shapeRenderer.rect(x, y + boxHeight - 2f, boxWidth, 2f);
-        shapeRenderer.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
+        tooltipX = x;
+        tooltipY = y;
+        tooltipVisible = true;
+    }
 
-        spriteBatch.begin();
+    private void renderTooltipBoxFilled() {
+        if (!tooltipVisible) {
+            return;
+        }
+        float boxWidth = tooltipTextWidth + tooltipPaddingX * 2f;
+        float boxHeight = tooltipTextHeight + tooltipPaddingY * 2f;
+
+        shapeRenderer.setColor(0.05f, 0.05f, 0.08f, 0.9f);
+        shapeRenderer.rect(tooltipX, tooltipY, boxWidth, boxHeight);
+        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
+        shapeRenderer.rect(tooltipX, tooltipY, boxWidth, 2f);
+        shapeRenderer.rect(tooltipX, tooltipY, 2f, boxHeight);
+        shapeRenderer.rect(tooltipX + boxWidth - 2f, tooltipY, 2f, boxHeight);
+        shapeRenderer.rect(tooltipX, tooltipY + boxHeight - 2f, boxWidth, 2f);
+    }
+
+    private void renderTooltipText() {
+        if (!tooltipVisible) {
+            return;
+        }
         font.setColor(Color.WHITE);
-        font.draw(spriteBatch, glyphLayout, x + paddingX, y + paddingY + glyphLayout.height);
-        spriteBatch.end();
+        font.draw(spriteBatch, tooltipText, tooltipX + tooltipPaddingX, tooltipY + tooltipPaddingY + tooltipTextHeight);
     }
 
     private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {
@@ -288,41 +324,52 @@ public final class HudRenderer {
         font.draw(batch, text, Math.round(x), Math.round(y));
     }
 
-    private void renderDebugBox(Stage stage, String text) {
+    private void updateDebugData(Stage stage, String text) {
+        debugVisible = false;
+        debugTextCached = null;
         if (text == null || text.isEmpty()) {
             return;
         }
-        glyphLayout.setText(font, text);
+        debugTextCached = text;
+        glyphLayout.setText(font, debugTextCached);
 
-        float paddingX = 8f;
-        float paddingY = 6f;
+        debugPaddingX = 8f;
+        debugPaddingY = 6f;
+        debugTextWidth = glyphLayout.width;
+        debugTextHeight = glyphLayout.height;
         float margin = 10f;
-        float boxWidth = glyphLayout.width + paddingX * 2f;
-        float boxHeight = glyphLayout.height + paddingY * 2f;
+        float boxWidth = debugTextWidth + debugPaddingX * 2f;
+        float boxHeight = debugTextHeight + debugPaddingY * 2f;
 
-        float x = margin;
-        float y = stage.getViewport().getWorldHeight() - margin - boxHeight;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
-        shapeRenderer.rect(x, y, boxWidth, boxHeight);
-        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
-        shapeRenderer.rect(x, y, boxWidth, 2f);
-        shapeRenderer.rect(x, y, 2f, boxHeight);
-        shapeRenderer.rect(x + boxWidth - 2f, y, 2f, boxHeight);
-        shapeRenderer.rect(x, y + boxHeight - 2f, boxWidth, 2f);
-        shapeRenderer.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-
-        spriteBatch.begin();
-        font.setColor(Color.WHITE);
-        font.draw(spriteBatch, glyphLayout, x + paddingX, y + paddingY + glyphLayout.height);
-        spriteBatch.end();
+        debugX = margin;
+        debugY = stage.getViewport().getWorldHeight() - margin - boxHeight;
+        debugVisible = true;
     }
 
-    private void renderMinimap(Stage stage, Grid grid, Player player, float companionX, float companionY) {
+    private void renderDebugBoxFilled() {
+        if (!debugVisible) {
+            return;
+        }
+        float boxWidth = debugTextWidth + debugPaddingX * 2f;
+        float boxHeight = debugTextHeight + debugPaddingY * 2f;
+        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
+        shapeRenderer.rect(debugX, debugY, boxWidth, boxHeight);
+        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
+        shapeRenderer.rect(debugX, debugY, boxWidth, 2f);
+        shapeRenderer.rect(debugX, debugY, 2f, boxHeight);
+        shapeRenderer.rect(debugX + boxWidth - 2f, debugY, 2f, boxHeight);
+        shapeRenderer.rect(debugX, debugY + boxHeight - 2f, boxWidth, 2f);
+    }
+
+    private void renderDebugText() {
+        if (!debugVisible) {
+            return;
+        }
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, debugTextCached, debugX + debugPaddingX, debugY + debugPaddingY + debugTextHeight);
+    }
+
+    private void renderMinimapFilled(Stage stage, Grid grid, Player player, float companionX, float companionY) {
         if (grid == null || player == null) {
             return;
         }
@@ -344,11 +391,7 @@ public final class HudRenderer {
 
         float pad = 6f;
 
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-
         // Background
-        shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
         shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
 
@@ -382,39 +425,31 @@ public final class HudRenderer {
         float halfCompanion = companionSize * 0.5f;
         shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
         shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
-        shapeRenderer.end();
-
-        // Border
-        shapeRenderer.begin(ShapeType.Line);
-        shapeRenderer.setColor(0.4f, 0.4f, 0.44f, 1f);
-        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
-        shapeRenderer.end();
-
-        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    private BitmapFont loadFont() {
-        FreeTypeFontGenerator generator = null;
-        try {
-            generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/minecraft_font.ttf"));
-            FreeTypeFontParameter params = new FreeTypeFontParameter();
-            params.size = 14;
-            params.borderWidth = 0.9f;
-            params.borderColor = new Color(0f, 0f, 0f, 0.6f);
-            params.minFilter = TextureFilter.Nearest;
-            params.magFilter = TextureFilter.Nearest;
-            params.color = Color.WHITE;
-            return generator.generateFont(params);
-        } catch (Exception e) {
-            Gdx.app.error("HudRenderer", "Failed to load custom font, falling back to default", e);
-            BitmapFont fallback = new BitmapFont();
-            fallback.getRegion().getTexture().setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-            return fallback;
-        } finally {
-            if (generator != null) {
-                generator.dispose();
-            }
+    private void renderMinimapOutline(Stage stage, Grid grid, Player player, float companionX, float companionY) {
+        if (grid == null || player == null) {
+            return;
         }
+
+        float viewportWidth = stage.getViewport().getWorldWidth();
+        float viewportHeight = stage.getViewport().getWorldHeight();
+
+        float margin = 12f;
+        float maxWidth = 240f;
+        float maxHeight = 170f;
+        float tile = Math.min(maxWidth / grid.getColumns(), maxHeight / grid.getRows());
+        tile = Math.max(2f, tile);
+
+        float mapWidth = tile * grid.getColumns();
+        float mapHeight = tile * grid.getRows();
+        float originX = viewportWidth - margin - mapWidth;
+        float originY = viewportHeight - margin - mapHeight;
+
+        float pad = 6f;
+
+        shapeRenderer.setColor(0.4f, 0.4f, 0.44f, 1f);
+        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
     }
 
     public int hitTestSlot(Stage stage, float screenX, float screenY, boolean inventoryOpen) {
@@ -437,7 +472,5 @@ public final class HudRenderer {
     public void dispose() {
         shapeRenderer.dispose();
         spriteBatch.dispose();
-        font.dispose();
-        whiteTexture.dispose();
     }
 }
