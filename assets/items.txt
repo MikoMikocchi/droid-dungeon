@@ -1,6 +1,6 @@
 # id;displayName;maxStack;texturePath;equippable;maxDurability
-test_chip;Test Chip;32;items/test_chip.png
+test_chip;Test Chip;32;textures/items/test_chip.png
 
-steel_rapier;Steel Rapier;1;items/weapons/steel_rapier.png;true;220
+steel_rapier;Steel Rapier;1;textures/items/weapons/steel_rapier.png;true;220
 
-steel_pickaxe;Steel Pickaxe;1;items/tools/steel_pickaxe.png;true;280
+steel_pickaxe;Steel Pickaxe;1;textures/items/tools/steel_pickaxe.png;true;280
