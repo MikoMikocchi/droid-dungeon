@@ -4,8 +4,6 @@ import java.util.List;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -26,22 +24,14 @@ public final class WorldRenderer {
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
     private final TextureRegion whiteRegion;
-    private final Texture playerTexture;
     private final TextureRegion playerRegion;
-    private final Texture doroTexture;
     private final TextureRegion doroRegion;
 
     public WorldRenderer() {
         font = RenderAssets.font(13);
         whiteRegion = RenderAssets.whiteRegion();
-
-        playerTexture = new Texture(Gdx.files.internal("characters/Player.png"));
-        playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-        playerRegion = new TextureRegion(playerTexture);
-
-        doroTexture = new Texture(Gdx.files.internal("characters/Doro.png"));
-        doroTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-        doroRegion = new TextureRegion(doroTexture);
+        playerRegion = RenderAssets.playerRegion();
+        doroRegion = RenderAssets.doroRegion();
     }
 
     public void render(
@@ -157,8 +147,6 @@ public final class WorldRenderer {
     public void dispose() {
         shapeRenderer.dispose();
         spriteBatch.dispose();
-        playerTexture.dispose();
-        doroTexture.dispose();
     }
 
     private void drawCount(SpriteBatch batch, String text, float x, float y, float textWidth, float textHeight) {

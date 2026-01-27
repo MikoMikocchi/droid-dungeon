@@ -20,12 +20,17 @@ public final class DungeonGenerator {
     private final int maxRoomSize = 10;
     private final int targetRooms;
     private final int maxPlacementAttempts;
-    private final int corridorWidth = 2;
+    private int corridorWidth;
 
     private DungeonGenerator(int columns, int rows, long seed) {
+        this(columns, rows, seed, 2);
+    }
+
+    DungeonGenerator(int columns, int rows, long seed, int corridorWidth) {
         this.columns = columns;
         this.rows = rows;
         this.random = new Random(seed);
+        this.corridorWidth = Math.max(1, corridorWidth);
         // Rough heuristic: enough rooms to fill ~20-25% of area with floors.
         this.targetRooms = Math.max(14, Math.min(40, (columns * rows) / 160));
         this.maxPlacementAttempts = targetRooms * 8;
@@ -197,7 +202,7 @@ public final class DungeonGenerator {
     }
 
     private void carveColumn(Grid grid, int x, int centerY) {
-        int startY = centerY - (corridorWidth - 1) / 2;
+        int startY = centerY - corridorWidth / 2 + (corridorWidth % 2 == 0 ? 1 : 0);
         for (int i = 0; i < corridorWidth; i++) {
             int y = startY + i;
             if (grid.isInside(x, y)) {

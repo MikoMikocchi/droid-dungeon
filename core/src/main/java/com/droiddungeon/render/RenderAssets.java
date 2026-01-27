@@ -17,6 +17,10 @@ public final class RenderAssets {
     private static final Map<Integer, BitmapFont> fontsBySize = new HashMap<>();
     private static Texture whiteTexture;
     private static TextureRegion whiteRegion;
+    private static Texture playerTexture;
+    private static TextureRegion playerRegion;
+    private static Texture doroTexture;
+    private static TextureRegion doroRegion;
 
     private RenderAssets() {
     }
@@ -54,6 +58,34 @@ public final class RenderAssets {
             whiteTexture = null;
             whiteRegion = null;
         }
+        if (playerTexture != null) {
+            playerTexture.dispose();
+            playerTexture = null;
+            playerRegion = null;
+        }
+        if (doroTexture != null) {
+            doroTexture.dispose();
+            doroTexture = null;
+            doroRegion = null;
+        }
+    }
+
+    public static TextureRegion playerRegion() {
+        if (playerRegion == null) {
+            playerTexture = new Texture(Gdx.files.internal("characters/Player.png"));
+            playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            playerRegion = new TextureRegion(playerTexture);
+        }
+        return playerRegion;
+    }
+
+    public static TextureRegion doroRegion() {
+        if (doroRegion == null) {
+            doroTexture = new Texture(Gdx.files.internal("characters/Doro.png"));
+            doroTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            doroRegion = new TextureRegion(doroTexture);
+        }
+        return doroRegion;
     }
 
     private static BitmapFont loadFont(int size) {

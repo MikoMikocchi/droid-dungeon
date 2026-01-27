@@ -1,8 +1,6 @@
 package com.droiddungeon;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 
@@ -28,6 +26,7 @@ import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.render.WorldRenderer;
+import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.ui.HudRenderer;
 
 public class DroidDungeonGame extends ApplicationAdapter {
@@ -50,15 +49,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     private final float cameraLerp = 6f;
     private final float cameraZoom = 1f;
-    private int companionGridX;
-    private int companionGridY;
-    private float companionRenderX;
-    private float companionRenderY;
-    private final int companionDelayTiles = 3;
-    private final float companionSpeedTilesPerSecond = 12f;
-    private final Deque<int[]> followerTrail = new ArrayDeque<>();
-    private int lastPlayerGridX;
-    private int lastPlayerGridY;
+    private CompanionSystem companionSystem;
 
     @Override
     public void create() {
@@ -73,17 +64,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         DungeonGenerator.DungeonLayout layout = DungeonGenerator.generate(columns, rows, tileSize, seed);
         grid = layout.grid();
         player = new Player(layout.spawnX(), layout.spawnY());
-        companionGridX = player.getGridX();
-        companionGridY = player.getGridY();
-        companionRenderX = companionGridX;
-        companionRenderY = companionGridY;
-        lastPlayerGridX = player.getGridX();
-        lastPlayerGridY = player.getGridY();
-        // Seed the trail so Doro starts behind after a few steps.
-        followerTrail.clear();
-        for (int i = 0; i < companionDelayTiles; i++) {
-            followerTrail.addLast(new int[]{companionGridX, companionGridY});
-        }
+        companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), 3, 12f);
 
         worldRenderer = new WorldRenderer();
         hudRenderer = new HudRenderer();
@@ -98,7 +79,6 @@ public class DroidDungeonGame extends ApplicationAdapter {
         seedDemoItems();
 
         // Input is handled by polling (for held-key movement)
-        Gdx.input.setInputProcessor(stage);
     }
 
     @Override
@@ -150,17 +130,17 @@ public class DroidDungeonGame extends ApplicationAdapter {
         if (!inventoryOpen) {
             movementController.update(grid, player);
         }
-        updateFollowerTrail();
+        companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
         player.update(delta, 10f);
-        updateCompanionRender(delta);
+        companionSystem.updateRender(delta);
 
         float gridOriginX = (worldViewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
         float gridOriginY = (worldViewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
         updateCamera(delta, gridOriginX, gridOriginY);
 
-        worldRenderer.render(worldViewport, grid, player, groundItems, itemRegistry, companionRenderX, companionRenderY);
+        worldRenderer.render(worldViewport, grid, player, groundItems, itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText, grid, player, companionRenderX, companionRenderY);
+        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY());
     }
 
     @Override
@@ -344,43 +324,6 @@ public class DroidDungeonGame extends ApplicationAdapter {
         camera.update();
     }
 
-    private void updateFollowerTrail() {
-        int px = player.getGridX();
-        int py = player.getGridY();
-        if (px != lastPlayerGridX || py != lastPlayerGridY) {
-            followerTrail.addLast(new int[]{px, py});
-            while (followerTrail.size() > companionDelayTiles) {
-                int[] next = followerTrail.removeFirst();
-                companionGridX = next[0];
-                companionGridY = next[1];
-            }
-            lastPlayerGridX = px;
-            lastPlayerGridY = py;
-        }
-    }
-
-    private void updateCompanionRender(float deltaSeconds) {
-        float targetX = companionGridX;
-        float targetY = companionGridY;
-        float dx = targetX - companionRenderX;
-        float dy = targetY - companionRenderY;
-        float dist2 = dx * dx + dy * dy;
-        if (dist2 < 0.000001f || deltaSeconds <= 0f) {
-            companionRenderX = targetX;
-            companionRenderY = targetY;
-            return;
-        }
-        float dist = (float) Math.sqrt(dist2);
-        float step = companionSpeedTilesPerSecond * deltaSeconds;
-        if (step >= dist) {
-            companionRenderX = targetX;
-            companionRenderY = targetY;
-            return;
-        }
-        companionRenderX += (dx / dist) * step;
-        companionRenderY += (dy / dist) * step;
-    }
-
     private String buildDebugText(float gridOriginX, float gridOriginY) {
         float tileSize = grid.getTileSize();
         Vector2 world = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
@@ -402,8 +345,8 @@ public class DroidDungeonGame extends ApplicationAdapter {
                 hasEntities = true;
             }
 
-            int doroX = companionGridX;
-            int doroY = companionGridY;
+            int doroX = companionSystem.getGridX();
+            int doroY = companionSystem.getGridY();
             if (doroX == tileX && doroY == tileY) {
                 text.append(hasEntities ? ", " : "\nEntity: ").append("Doro");
                 hasEntities = true;

@@ -22,4 +22,14 @@ subprojects {
         options.encoding = "UTF-8"
         options.release.set(21)
     }
+
+    dependencies {
+        add("testImplementation", platform("org.junit:junit-bom:5.10.1"))
+        add("testImplementation", "org.junit.jupiter:junit-jupiter")
+        add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
+    }
+
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform()
+    }
 }
