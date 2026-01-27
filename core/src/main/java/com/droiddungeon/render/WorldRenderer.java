@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
@@ -25,6 +26,9 @@ public final class WorldRenderer {
     private final TextureRegion whiteRegion;
     private final TextureRegion playerRegion;
     private final TextureRegion doroRegion;
+    private final Color tempColor = new Color();
+    private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
+    private static final Color DANGER_TINT = new Color(0.82f, 0.25f, 0.25f, 1f);
 
     public WorldRenderer() {
         font = RenderAssets.font(13);
@@ -49,12 +53,14 @@ public final class WorldRenderer {
         spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
         float tileSize = grid.getTileSize();
+        VisibleWindow visible = VisibleWindow.from(viewport, tileSize);
 
-        renderTileFill(grid, gridOriginX, gridOriginY, tileSize);
-        renderGridLines(grid, gridOriginX, gridOriginY, tileSize);
+        renderTileFill(grid, tileSize, visible);
+        renderGridLines(tileSize, visible);
+
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
-        renderGroundItems(groundItems, itemRegistry, gridOriginX, gridOriginY, tileSize);
+        renderGroundItems(groundItems, itemRegistry, tileSize, gridOriginX, gridOriginY);
         renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
         spriteBatch.end();
@@ -70,15 +76,16 @@ public final class WorldRenderer {
         spriteBatch.draw(doroRegion, drawX, drawY, drawSize, drawSize);
     }
 
-    private void renderTileFill(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
+    private void renderTileFill(Grid grid, float tileSize, VisibleWindow visible) {
         shapeRenderer.begin(ShapeType.Filled);
-        for (int y = 0; y < grid.getRows(); y++) {
-            for (int x = 0; x < grid.getColumns(); x++) {
+        for (int y = visible.minTileY; y <= visible.maxTileY; y++) {
+            for (int x = visible.minTileX; x <= visible.maxTileX; x++) {
                 TileMaterial material = grid.getTileMaterial(x, y);
-                shapeRenderer.setColor(material.lightColor());
+                com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(x, y);
+                shapeRenderer.setColor(colorFor(material, roomType, x + y));
                 shapeRenderer.rect(
-                        gridOriginX + x * tileSize,
-                        gridOriginY + y * tileSize,
+                        x * tileSize,
+                        y * tileSize,
                         tileSize,
                         tileSize
                 );
@@ -87,17 +94,17 @@ public final class WorldRenderer {
         shapeRenderer.end();
     }
 
-    private void renderGridLines(Grid grid, float gridOriginX, float gridOriginY, float tileSize) {
+    private void renderGridLines(float tileSize, VisibleWindow visible) {
         shapeRenderer.begin(ShapeType.Line);
-        shapeRenderer.setColor(0.2f, 0.2f, 0.2f, 1f);
+        shapeRenderer.setColor(0.2f, 0.2f, 0.2f, 0.65f);
 
-        for (int x = 0; x <= grid.getColumns(); x++) {
-            float worldX = gridOriginX + x * tileSize;
-            shapeRenderer.line(worldX, gridOriginY, worldX, gridOriginY + grid.getWorldHeight());
+        for (int x = visible.minTileX; x <= visible.maxTileX + 1; x++) {
+            float worldX = x * tileSize;
+            shapeRenderer.line(worldX, visible.minTileY * tileSize, worldX, (visible.maxTileY + 1) * tileSize);
         }
-        for (int y = 0; y <= grid.getRows(); y++) {
-            float worldY = gridOriginY + y * tileSize;
-            shapeRenderer.line(gridOriginX, worldY, gridOriginX + grid.getWorldWidth(), worldY);
+        for (int y = visible.minTileY; y <= visible.maxTileY + 1; y++) {
+            float worldY = y * tileSize;
+            shapeRenderer.line(visible.minTileX * tileSize, worldY, (visible.maxTileX + 1) * tileSize, worldY);
         }
         shapeRenderer.end();
     }
@@ -105,9 +112,9 @@ public final class WorldRenderer {
     private void renderGroundItems(
             List<GroundItem> groundItems,
             ItemRegistry itemRegistry,
+            float tileSize,
             float gridOriginX,
-            float gridOriginY,
-            float tileSize
+            float gridOriginY
     ) {
         if (groundItems == null || groundItems.isEmpty()) {
             return;
@@ -164,5 +171,44 @@ public final class WorldRenderer {
         font.draw(batch, text, Math.round(x), Math.round(y));
     }
 
-    
+    private Color colorFor(TileMaterial material, RoomType roomType, int parity) {
+        Color base = material.colorForParity(parity);
+        if (roomType == RoomType.SAFE) {
+            float t = 0.45f;
+            return tempColor.set(
+                    SAFE_TINT.r * (1f - t) + base.r * t,
+                    SAFE_TINT.g * (1f - t) + base.g * t,
+                    SAFE_TINT.b * (1f - t) + base.b * t,
+                    1f
+            );
+        }
+        if (roomType == RoomType.DANGER) {
+            float t = 0.35f;
+            return tempColor.set(
+                    DANGER_TINT.r * (1f - t) + base.r * t,
+                    DANGER_TINT.g * (1f - t) + base.g * t,
+                    DANGER_TINT.b * (1f - t) + base.b * t,
+                    1f
+            );
+        }
+        return tempColor.set(base);
+    }
+
+    private record VisibleWindow(int minTileX, int minTileY, int maxTileX, int maxTileY) {
+        static VisibleWindow from(Viewport viewport, float tileSize) {
+            com.badlogic.gdx.graphics.OrthographicCamera cam = (com.badlogic.gdx.graphics.OrthographicCamera) viewport.getCamera();
+            float halfW = cam.viewportWidth * cam.zoom * 0.5f;
+            float halfH = cam.viewportHeight * cam.zoom * 0.5f;
+            float minWorldX = cam.position.x - halfW;
+            float maxWorldX = cam.position.x + halfW;
+            float minWorldY = cam.position.y - halfH;
+            float maxWorldY = cam.position.y + halfH;
+
+            int minTileX = (int) Math.floor(minWorldX / tileSize) - 2;
+            int maxTileX = (int) Math.ceil(maxWorldX / tileSize) + 2;
+            int minTileY = (int) Math.floor(minWorldY / tileSize) - 2;
+            int maxTileY = (int) Math.ceil(maxWorldY / tileSize) + 2;
+            return new VisibleWindow(minTileX, minTileY, maxTileX, maxTileY);
+        }
+    }
 }

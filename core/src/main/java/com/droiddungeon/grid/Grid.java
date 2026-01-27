@@ -1,88 +1,117 @@
 package com.droiddungeon.grid;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Infinite, chunk-backed tile field. Chunks are generated lazily via {@link DungeonGenerator.ChunkGenerator}
+ * and cached in memory. Coordinates are world-space tile indices (can be negative).
+ */
 public final class Grid {
-    private final int columns;
-    private final int rows;
     private final float tileSize;
-    private final TileMaterial[][] tileMaterials;
+    private final DungeonGenerator.ChunkGenerator chunkGenerator;
+    private final Map<Long, DungeonGenerator.Chunk> chunks = new HashMap<>();
 
-    public Grid(int columns, int rows, float tileSize) {
-        this(columns, rows, tileSize, TileMaterial.STONE);
-    }
+    // Bounds of generated tiles (inclusive) for debug visualisation.
+    private int minGeneratedX = 0;
+    private int maxGeneratedX = 0;
+    private int minGeneratedY = 0;
+    private int maxGeneratedY = 0;
 
-    public Grid(int columns, int rows, float tileSize, TileMaterial fillMaterial) {
-        if (columns <= 0 || rows <= 0) {
-            throw new IllegalArgumentException("Grid size must be positive");
-        }
+    public Grid(float tileSize, DungeonGenerator.ChunkGenerator chunkGenerator) {
         if (tileSize <= 0f) {
             throw new IllegalArgumentException("tileSize must be positive");
         }
-        this.columns = columns;
-        this.rows = rows;
         this.tileSize = tileSize;
-        TileMaterial material = fillMaterial == null ? TileMaterial.STONE : fillMaterial;
-        this.tileMaterials = new TileMaterial[columns][rows];
-        fill(material);
+        this.chunkGenerator = Objects.requireNonNull(chunkGenerator, "chunkGenerator");
     }
 
-    public int getColumns() {
-        return columns;
+    /**
+     * Ensures a chunk is generated and cached.
+     */
+    public DungeonGenerator.Chunk ensureChunk(int chunkX, int chunkY) {
+        long key = key(chunkX, chunkY);
+        DungeonGenerator.Chunk chunk = chunks.get(key);
+        if (chunk != null) {
+            return chunk;
+        }
+        DungeonGenerator.Chunk generated = chunkGenerator.generate(chunkX, chunkY);
+        chunks.put(key, generated);
+        updateBounds(generated);
+        return generated;
     }
 
-    public int getRows() {
-        return rows;
+    private void updateBounds(DungeonGenerator.Chunk chunk) {
+        int originX = chunk.originX();
+        int originY = chunk.originY();
+        int endX = originX + chunkGenerator.chunkSize() - 1;
+        int endY = originY + chunkGenerator.chunkSize() - 1;
+        if (chunks.size() == 1) {
+            minGeneratedX = originX;
+            maxGeneratedX = endX;
+            minGeneratedY = originY;
+            maxGeneratedY = endY;
+        } else {
+            minGeneratedX = Math.min(minGeneratedX, originX);
+            maxGeneratedX = Math.max(maxGeneratedX, endX);
+            minGeneratedY = Math.min(minGeneratedY, originY);
+            maxGeneratedY = Math.max(maxGeneratedY, endY);
+        }
+    }
+
+    private long key(int chunkX, int chunkY) {
+        return ((long) chunkX << 32) ^ (chunkY & 0xffffffffL);
+    }
+
+    private DungeonGenerator.TileCell cellAt(int x, int y) {
+        int chunkX = Math.floorDiv(x, chunkGenerator.chunkSize());
+        int chunkY = Math.floorDiv(y, chunkGenerator.chunkSize());
+        DungeonGenerator.Chunk chunk = ensureChunk(chunkX, chunkY);
+        return chunk.cellAt(x, y);
+    }
+
+    public TileMaterial getTileMaterial(int x, int y) {
+        return cellAt(x, y).material;
+    }
+
+    public DungeonGenerator.RoomType getRoomType(int x, int y) {
+        return cellAt(x, y).roomType;
+    }
+
+    public boolean isWalkable(int x, int y) {
+        return getTileMaterial(x, y).isWalkable();
+    }
+
+    /**
+     * Infinite world -> always true.
+     */
+    public boolean isInside(int x, int y) {
+        return true;
     }
 
     public float getTileSize() {
         return tileSize;
     }
 
-    public float getWorldWidth() {
-        return columns * tileSize;
+    public int getChunkSize() {
+        return chunkGenerator.chunkSize();
     }
 
-    public float getWorldHeight() {
-        return rows * tileSize;
+    public int getMinGeneratedX() {
+        return minGeneratedX;
     }
 
-    public boolean isInside(int x, int y) {
-        return x >= 0 && x < columns && y >= 0 && y < rows;
+    public int getMaxGeneratedX() {
+        return maxGeneratedX;
     }
 
-    public boolean isWalkable(int x, int y) {
-        if (!isInside(x, y)) {
-            return false;
-        }
-        return tileMaterials[x][y].isWalkable();
+    public int getMinGeneratedY() {
+        return minGeneratedY;
     }
 
-    public TileMaterial getTileMaterial(int x, int y) {
-        ensureInside(x, y);
-        return tileMaterials[x][y];
-    }
-
-    public void setTileMaterial(int x, int y, TileMaterial material) {
-        if (material == null) {
-            throw new IllegalArgumentException("material must not be null");
-        }
-        ensureInside(x, y);
-        tileMaterials[x][y] = material;
-    }
-
-    public void fill(TileMaterial material) {
-        if (material == null) {
-            throw new IllegalArgumentException("material must not be null");
-        }
-        for (int x = 0; x < columns; x++) {
-            for (int y = 0; y < rows; y++) {
-                tileMaterials[x][y] = material;
-            }
-        }
-    }
-
-    private void ensureInside(int x, int y) {
-        if (!isInside(x, y)) {
-            throw new IndexOutOfBoundsException("Grid position out of bounds: (" + x + ", " + y + ")");
-        }
+    public int getMaxGeneratedY() {
+        return maxGeneratedY;
     }
 }
+

@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.render.RenderAssets;
@@ -43,17 +44,23 @@ public final class DebugOverlay {
         float viewportWidth = viewport.getWorldWidth();
         float viewportHeight = viewport.getWorldHeight();
 
+        int radius = 18; // tiles shown from center in each direction
+        int windowSize = radius * 2 + 1;
+
         float margin = 12f;
         float maxWidth = 240f;
         float maxHeight = 170f;
-        float tile = Math.min(maxWidth / grid.getColumns(), maxHeight / grid.getRows());
+        float tile = Math.min(maxWidth / windowSize, maxHeight / windowSize);
         tile = Math.max(2f, tile);
 
-        float mapWidth = tile * grid.getColumns();
-        float mapHeight = tile * grid.getRows();
+        float mapWidth = tile * windowSize;
+        float mapHeight = tile * windowSize;
         float originX = viewportWidth - margin - mapWidth;
         float originY = viewportHeight - margin - mapHeight;
         float pad = 6f;
+
+        int minX = player.getGridX() - radius;
+        int minY = player.getGridY() - radius;
 
         Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -62,32 +69,37 @@ public final class DebugOverlay {
         shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
         shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
 
-        for (int y = 0; y < grid.getRows(); y++) {
-            for (int x = 0; x < grid.getColumns(); x++) {
+        for (int y = 0; y < windowSize; y++) {
+            for (int x = 0; x < windowSize; x++) {
+                int worldX = minX + x;
+                int worldY = minY + y;
                 float drawX = originX + x * tile;
                 float drawY = originY + y * tile;
-                Color color = grid.getTileMaterial(x, y).darkColor();
-                float r = 0.18f + color.r * 0.75f;
-                float g = 0.18f + color.g * 0.75f;
-                float b = 0.18f + color.b * 0.75f;
-                shapeRenderer.setColor(r, g, b, 0.95f);
+                Color base = grid.getTileMaterial(worldX, worldY).darkColor();
+                com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(worldX, worldY);
+                Color tint = colorForRoom(base, roomType);
+                shapeRenderer.setColor(tint);
                 shapeRenderer.rect(drawX, drawY, tile, tile);
             }
         }
 
-        float playerX = originX + (player.getRenderX() + 0.5f) * tile;
-        float playerY = originY + (player.getRenderY() + 0.5f) * tile;
+        float playerX = originX + (radius + 0.5f) * tile;
+        float playerY = originY + (radius + 0.5f) * tile;
         float markerSize = Math.max(3f, tile * 0.55f);
         float halfMarker = markerSize * 0.5f;
         shapeRenderer.setColor(0.98f, 0.86f, 0.3f, 1f);
         shapeRenderer.rect(playerX - halfMarker, playerY - halfMarker, markerSize, markerSize);
 
-        float companionWorldX = originX + (companionX + 0.5f) * tile;
-        float companionWorldY = originY + (companionY + 0.5f) * tile;
-        float companionSize = Math.max(3f, tile * 0.45f);
-        float halfCompanion = companionSize * 0.5f;
-        shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
-        shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
+        float companionLocalX = companionX - player.getRenderX();
+        float companionLocalY = companionY - player.getRenderY();
+        if (Math.abs(companionLocalX) <= radius && Math.abs(companionLocalY) <= radius) {
+            float companionWorldX = originX + (radius + companionLocalX + 0.5f) * tile;
+            float companionWorldY = originY + (radius + companionLocalY + 0.5f) * tile;
+            float companionSize = Math.max(3f, tile * 0.45f);
+            float halfCompanion = companionSize * 0.5f;
+            shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
+            shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
+        }
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeType.Line);
@@ -137,5 +149,15 @@ public final class DebugOverlay {
     public void dispose() {
         shapeRenderer.dispose();
         spriteBatch.dispose();
+    }
+
+    private Color colorForRoom(Color base, RoomType roomType) {
+        if (roomType == RoomType.SAFE) {
+            return new Color(0.32f, 0.55f, 0.95f, 0.95f);
+        }
+        if (roomType == RoomType.DANGER) {
+            return new Color(0.82f, 0.26f, 0.26f, 0.95f);
+        }
+        return new Color(base.r * 0.75f + 0.18f, base.g * 0.75f + 0.18f, base.b * 0.75f + 0.18f, 0.95f);
     }
 }

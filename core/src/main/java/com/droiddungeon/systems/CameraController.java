@@ -29,12 +29,12 @@ public final class CameraController {
     }
 
     public void update(Grid grid, Player player, float deltaSeconds) {
-        gridOriginX = (viewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
-        gridOriginY = (viewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
+        gridOriginX = 0f;
+        gridOriginY = 0f;
 
         float tileSize = grid.getTileSize();
-        float targetX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
-        float targetY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
+        float targetX = (player.getRenderX() + 0.5f) * tileSize;
+        float targetY = (player.getRenderY() + 0.5f) * tileSize;
 
         float lerp = 1f - (float) Math.exp(-cameraLerp * deltaSeconds);
         camera.position.x += (targetX - camera.position.x) * lerp;

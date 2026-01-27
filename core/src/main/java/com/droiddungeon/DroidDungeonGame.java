@@ -59,7 +59,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
         long seed = TimeUtils.millis();
-        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generate(config.columns(), config.rows(), config.tileSize(), seed);
+        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), seed);
         grid = layout.grid();
         player = new Player(layout.spawnX(), layout.spawnY());
         companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
@@ -138,9 +138,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     private void seedDemoItems() {
         inventory.add(new ItemStack("test_chip", 8), itemRegistry);
-        int dropX = Math.min(grid.getColumns() - 1, player.getGridX() + 1);
-        int dropY = player.getGridY();
-        inventorySystem.addGroundStack(dropX, dropY, new ItemStack("test_chip", 5));
+        inventorySystem.addGroundStack(player.getGridX() + 1, player.getGridY(), new ItemStack("test_chip", 5));
     }
 
     private String buildDebugText(float gridOriginX, float gridOriginY) {
