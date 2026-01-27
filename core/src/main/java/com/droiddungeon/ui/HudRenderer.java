@@ -10,9 +10,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.droiddungeon.grid.Grid;
-import com.droiddungeon.grid.Player;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
@@ -49,7 +47,7 @@ public final class HudRenderer {
     }
 
     public void render(
-            Stage stage,
+            Viewport viewport,
             Inventory inventory,
             ItemRegistry itemRegistry,
             ItemStack cursorStack,
@@ -58,25 +56,25 @@ public final class HudRenderer {
             int hoveredSlotIndex,
             float deltaSeconds
     ) {
-        stage.getViewport().apply();
-        shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
-        spriteBatch.setProjectionMatrix(stage.getCamera().combined);
+        viewport.apply();
+        shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
+        spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        cacheLayout(stage, inventoryOpen);
+        cacheLayout(viewport, inventoryOpen);
 
-        updateTooltipData(stage, inventory, itemRegistry, hoveredSlotIndex);
+        updateTooltipData(viewport, inventory, itemRegistry, hoveredSlotIndex);
 
-        renderShapes(stage, inventory, inventoryOpen, selectedSlotIndex);
+        renderShapes(viewport, inventory, inventoryOpen, selectedSlotIndex);
 
         spriteBatch.begin();
         renderSlotContents(inventory, itemRegistry);
         renderTooltipText();
-        renderCursorStack(stage, itemRegistry, cursorStack);
+        renderCursorStack(viewport, itemRegistry, cursorStack);
         spriteBatch.end();
     }
 
-    private void cacheLayout(Stage stage, boolean inventoryOpen) {
-        float viewportWidth = stage.getViewport().getWorldWidth();
+    private void cacheLayout(Viewport viewport, boolean inventoryOpen) {
+        float viewportWidth = viewport.getWorldWidth();
         float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
         lastOriginX = (viewportWidth - hotbarWidth) * 0.5f;
         lastOriginY = padding;
@@ -84,7 +82,7 @@ public final class HudRenderer {
     }
 
     private void renderShapes(
-            Stage stage,
+            Viewport viewport,
             Inventory inventory,
             boolean inventoryOpen,
             int selectedSlotIndex
@@ -94,7 +92,7 @@ public final class HudRenderer {
 
         shapeRenderer.begin(ShapeType.Filled);
         if (inventoryOpen) {
-            renderInventoryBackdropFilled(stage.getViewport().getWorldWidth(), stage.getViewport().getWorldHeight());
+            renderInventoryBackdropFilled(viewport.getWorldWidth(), viewport.getWorldHeight());
         }
         renderSlotGridFilled(inventory, selectedSlotIndex);
         renderTooltipBoxFilled();
@@ -192,7 +190,7 @@ public final class HudRenderer {
         }
     }
 
-    private void renderCursorStack(Stage stage, ItemRegistry registry, ItemStack cursorStack) {
+    private void renderCursorStack(Viewport viewport, ItemRegistry registry, ItemStack cursorStack) {
         if (cursorStack == null) {
             return;
         }
@@ -202,7 +200,7 @@ public final class HudRenderer {
         }
 
         Vector2 screen = new Vector2(Gdx.input.getX(), Gdx.input.getY());
-        Vector2 world = stage.getViewport().unproject(screen);
+        Vector2 world = viewport.unproject(screen);
         TextureRegion icon = def.icon();
         float iconPadding = 6f;
         float drawSize = cellSize - iconPadding * 2f;
@@ -217,7 +215,7 @@ public final class HudRenderer {
         drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
     }
 
-    private void updateTooltipData(Stage stage, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
+    private void updateTooltipData(Viewport viewport, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
         tooltipVisible = false;
         tooltipText = null;
 
@@ -233,7 +231,7 @@ public final class HudRenderer {
             return;
         }
 
-        Vector2 world = stage.getViewport().unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        Vector2 world = viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
         tooltipText = def.displayName();
         glyphLayout.setText(font, tooltipText);
 
@@ -247,8 +245,8 @@ public final class HudRenderer {
         float x = world.x + 16f;
         float y = world.y + 20f;
 
-        float viewportWidth = stage.getViewport().getWorldWidth();
-        float viewportHeight = stage.getViewport().getWorldHeight();
+        float viewportWidth = viewport.getWorldWidth();
+        float viewportHeight = viewport.getWorldHeight();
         if (x + boxWidth > viewportWidth - 4f) {
             x = viewportWidth - boxWidth - 4f;
         }
@@ -301,10 +299,10 @@ public final class HudRenderer {
         font.draw(batch, text, Math.round(x), Math.round(y));
     }
 
-    public int hitTestSlot(Stage stage, float screenX, float screenY, boolean inventoryOpen) {
-        cacheLayout(stage, inventoryOpen);
+    public int hitTestSlot(Viewport viewport, float screenX, float screenY, boolean inventoryOpen) {
+        cacheLayout(viewport, inventoryOpen);
         Vector2 world = new Vector2(screenX, screenY);
-        stage.getViewport().unproject(world);
+        viewport.unproject(world);
 
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {

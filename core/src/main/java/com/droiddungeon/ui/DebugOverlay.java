@@ -5,13 +5,12 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.render.RenderAssets;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 /**
  * Renders debug text and minimap overlay.
@@ -21,29 +20,28 @@ public final class DebugOverlay {
     private final SpriteBatch spriteBatch = new SpriteBatch();
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
-    private final TextureRegion whiteRegion;
 
     public DebugOverlay() {
         font = RenderAssets.font(14);
-        whiteRegion = RenderAssets.whiteRegion();
+        RenderAssets.whiteRegion();
     }
 
-    public void render(Stage stage, Grid grid, Player player, float companionX, float companionY, String debugText) {
-        stage.getViewport().apply();
-        shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
-        spriteBatch.setProjectionMatrix(stage.getCamera().combined);
+    public void render(Viewport viewport, Grid grid, Player player, float companionX, float companionY, String debugText) {
+        viewport.apply();
+        shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
+        spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        renderMinimap(stage, grid, player, companionX, companionY);
-        renderDebugBox(stage, debugText);
+        renderMinimap(viewport, grid, player, companionX, companionY);
+        renderDebugBox(viewport, debugText);
     }
 
-    private void renderMinimap(Stage stage, Grid grid, Player player, float companionX, float companionY) {
+    private void renderMinimap(Viewport viewport, Grid grid, Player player, float companionX, float companionY) {
         if (grid == null || player == null) {
             return;
         }
 
-        float viewportWidth = stage.getViewport().getWorldWidth();
-        float viewportHeight = stage.getViewport().getWorldHeight();
+        float viewportWidth = viewport.getWorldWidth();
+        float viewportHeight = viewport.getWorldHeight();
 
         float margin = 12f;
         float maxWidth = 240f;
@@ -100,7 +98,7 @@ public final class DebugOverlay {
         Gdx.gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
     }
 
-    private void renderDebugBox(Stage stage, String text) {
+    private void renderDebugBox(Viewport viewport, String text) {
         if (text == null || text.isEmpty()) {
             return;
         }
@@ -113,7 +111,7 @@ public final class DebugOverlay {
         float boxHeight = glyphLayout.height + paddingY * 2f;
 
         float x = margin;
-        float y = stage.getViewport().getWorldHeight() - margin - boxHeight;
+        float y = viewport.getWorldHeight() - margin - boxHeight;
 
         Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);

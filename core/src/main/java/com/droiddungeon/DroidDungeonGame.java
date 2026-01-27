@@ -6,7 +6,6 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
-import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -30,9 +29,10 @@ import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 
 public class DroidDungeonGame extends ApplicationAdapter {
-    private Stage stage;
     private Viewport worldViewport;
+    private Viewport uiViewport;
     private OrthographicCamera worldCamera;
+    private OrthographicCamera uiCamera;
     private WorldRenderer worldRenderer;
     private HudRenderer hudRenderer;
     private DebugOverlay debugOverlay;
@@ -52,9 +52,10 @@ public class DroidDungeonGame extends ApplicationAdapter {
     @Override
     public void create() {
         config = GameConfig.defaults();
-        stage = new Stage(new ScreenViewport()); // UI stage
         worldCamera = new OrthographicCamera();
         worldViewport = new ScreenViewport(worldCamera);
+        uiCamera = new OrthographicCamera();
+        uiViewport = new ScreenViewport(uiCamera);
         cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
         long seed = TimeUtils.millis();
@@ -78,7 +79,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     @Override
     public void resize(int width, int height) {
-        stage.getViewport().update(width, height, true);
+        uiViewport.update(width, height, true);
         cameraController.resize(width, height);
     }
 
@@ -96,15 +97,14 @@ public class DroidDungeonGame extends ApplicationAdapter {
         }
 
         float delta = Gdx.graphics.getDeltaTime();
-        stage.act(delta);
 
         int hoveredSlot = -1;
         if (inventorySystem.isInventoryOpen()) {
-            hoveredSlot = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), true);
+            hoveredSlot = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), true);
         }
 
         if (Gdx.input.justTouched()) {
-            int clicked = hudRenderer.hitTestSlot(stage, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
+            int clicked = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
             if (clicked != -1) {
                 inventorySystem.onSlotClicked(clicked);
             }
@@ -123,13 +123,12 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(stage, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta);
-        debugOverlay.render(stage, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
+        hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta);
+        debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
     }
 
     @Override
     public void dispose() {
-        stage.dispose();
         worldRenderer.dispose();
         hudRenderer.dispose();
         debugOverlay.dispose();
