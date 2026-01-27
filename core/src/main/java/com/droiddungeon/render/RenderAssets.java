@@ -72,7 +72,7 @@ public final class RenderAssets {
 
     public static TextureRegion playerRegion() {
         if (playerRegion == null) {
-            playerTexture = new Texture(Gdx.files.internal("characters/Player.png"));
+            playerTexture = new Texture(Gdx.files.internal("textures/entities/humanoids/Player.png"));
             playerTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
             playerRegion = new TextureRegion(playerTexture);
         }
@@ -81,7 +81,7 @@ public final class RenderAssets {
 
     public static TextureRegion doroRegion() {
         if (doroRegion == null) {
-            doroTexture = new Texture(Gdx.files.internal("characters/Doro.png"));
+            doroTexture = new Texture(Gdx.files.internal("textures/entities/humanoids/Doro.png"));
             doroTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
             doroRegion = new TextureRegion(doroTexture);
         }

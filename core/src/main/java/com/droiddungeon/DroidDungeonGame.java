@@ -138,6 +138,14 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     private void seedDemoItems() {
         inventory.add(new ItemStack("test_chip", 8), itemRegistry);
+        ItemDefinition rapierDef = itemRegistry.get("steel_rapier");
+        if (rapierDef != null) {
+            inventory.add(new ItemStack("steel_rapier", 1, rapierDef.maxDurability()), itemRegistry);
+        }
+        ItemDefinition pickaxeDef = itemRegistry.get("steel_pickaxe");
+        if (pickaxeDef != null) {
+            inventory.add(new ItemStack("steel_pickaxe", 1, pickaxeDef.maxDurability()), itemRegistry);
+        }
         inventorySystem.addGroundStack(player.getGridX() + 1, player.getGridY(), new ItemStack("test_chip", 5));
     }
 
@@ -155,6 +163,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
             TileMaterial material = grid.getTileMaterial(tileX, tileY);
             text.append("Tile ").append(tileX).append(", ").append(tileY)
                     .append(" — ").append(material.displayName());
+
+            DungeonGenerator.RoomType roomType = grid.getRoomType(tileX, tileY);
+            text.append("\nRoom: ").append(roomType == null ? "Corridor" : roomType);
 
             boolean hasEntities = false;
             if (player.getGridX() == tileX && player.getGridY() == tileY) {
@@ -188,6 +199,19 @@ public class DroidDungeonGame extends ApplicationAdapter {
             }
         } else {
             text.append("Cursor: out of bounds");
+        }
+
+        ItemStack equipped = inventorySystem.getEquippedStack();
+        if (equipped != null) {
+            ItemDefinition def = itemRegistry.get(equipped.itemId());
+            String name = def != null ? def.displayName() : equipped.itemId();
+            text.append("\nEquipped: ").append(name);
+            if (def != null && def.maxDurability() > 0) {
+                int current = Math.min(equipped.durability(), def.maxDurability());
+                text.append(" (").append(current).append("/").append(def.maxDurability()).append(")");
+            }
+        } else {
+            text.append("\nEquipped: —");
         }
         return text.toString();
     }

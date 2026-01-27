@@ -49,7 +49,7 @@ public final class Inventory {
         // First, try to merge into existing stacks of the same item.
         for (int i = 0; i < TOTAL_SLOTS && remaining != null; i++) {
             ItemStack slot = slots[i];
-            if (slot == null || !slot.itemId().equals(remaining.itemId())) {
+            if (slot == null || !slot.canStackWith(remaining)) {
                 continue;
             }
             int max = resolvedSizer.maxStackSize(remaining.itemId());
@@ -72,7 +72,7 @@ public final class Inventory {
             }
             int max = resolvedSizer.maxStackSize(remaining.itemId());
             int placed = Math.min(max, remaining.count());
-            slots[i] = new ItemStack(remaining.itemId(), placed);
+            slots[i] = new ItemStack(remaining.itemId(), placed, remaining.durability());
             if (placed == remaining.count()) {
                 remaining = null;
             } else {

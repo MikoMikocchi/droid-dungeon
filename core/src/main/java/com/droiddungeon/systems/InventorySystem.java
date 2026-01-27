@@ -25,6 +25,7 @@ public final class InventorySystem {
     private ItemStack cursorStack;
     private boolean inventoryOpen;
     private int selectedSlotIndex;
+    private int equippedSlotIndex;
 
     public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid) {
         this.inventory = inventory;
@@ -33,6 +34,7 @@ public final class InventorySystem {
         this.cursorStack = null;
         this.inventoryOpen = false;
         this.selectedSlotIndex = 0;
+        this.equippedSlotIndex = -1;
     }
 
     public void updateInput() {
@@ -42,6 +44,7 @@ public final class InventorySystem {
         int hotbarKeySlot = pollHotbarNumberKey();
         if (hotbarKeySlot != -1) {
             selectedSlotIndex = hotbarKeySlot;
+            updateEquippedFromSelection();
         }
     }
 
@@ -50,6 +53,7 @@ public final class InventorySystem {
         if (!inventoryOpen && selectedSlotIndex >= Inventory.HOTBAR_SLOTS) {
             selectedSlotIndex %= Inventory.HOTBAR_SLOTS;
         }
+        updateEquippedFromSelection();
     }
 
     public void dropCurrentStack(Player player) {
@@ -68,6 +72,7 @@ public final class InventorySystem {
         } else {
             inventory.set(selectedSlotIndex, null);
         }
+        updateEquippedFromSelection();
     }
 
     public void pickUpItemsAtPlayer(Player player) {
@@ -101,6 +106,7 @@ public final class InventorySystem {
                 inventory.set(slotIndex, null);
             }
             selectedSlotIndex = slotIndex;
+            updateEquippedFromSelection();
             return;
         }
 
@@ -108,10 +114,11 @@ public final class InventorySystem {
             inventory.set(slotIndex, cursorStack);
             cursorStack = null;
             selectedSlotIndex = slotIndex;
+            updateEquippedFromSelection();
             return;
         }
 
-        if (slotStack.itemId().equals(cursorStack.itemId())) {
+        if (slotStack.canStackWith(cursorStack)) {
             int maxStack = itemRegistry.maxStackSize(slotStack.itemId());
             int space = maxStack - slotStack.count();
             if (space > 0) {
@@ -123,6 +130,7 @@ public final class InventorySystem {
                     cursorStack = cursorStack.withCount(cursorStack.count() - toTransfer);
                 }
                 selectedSlotIndex = slotIndex;
+                updateEquippedFromSelection();
                 return;
             }
         }
@@ -130,6 +138,7 @@ public final class InventorySystem {
         inventory.set(slotIndex, cursorStack);
         cursorStack = slotStack;
         selectedSlotIndex = slotIndex;
+        updateEquippedFromSelection();
     }
 
     public void addGroundStack(int gridX, int gridY, ItemStack stack) {
@@ -146,7 +155,7 @@ public final class InventorySystem {
             if (!groundItem.isAt(gridX, gridY)) {
                 continue;
             }
-            if (!groundItem.getStack().itemId().equals(remaining.itemId())) {
+            if (!groundItem.getStack().canStackWith(remaining)) {
                 continue;
             }
             int space = maxStack - groundItem.getStack().count();
@@ -164,7 +173,7 @@ public final class InventorySystem {
 
         while (remaining != null) {
             int chunk = Math.min(remaining.count(), maxStack);
-            groundItems.add(new GroundItem(gridX, gridY, new ItemStack(remaining.itemId(), chunk)));
+            groundItems.add(new GroundItem(gridX, gridY, new ItemStack(remaining.itemId(), chunk, remaining.durability())));
             if (remaining.count() <= maxStack) {
                 remaining = null;
             } else {
@@ -181,6 +190,17 @@ public final class InventorySystem {
         return selectedSlotIndex;
     }
 
+    public int getEquippedSlotIndex() {
+        return equippedSlotIndex;
+    }
+
+    public ItemStack getEquippedStack() {
+        if (equippedSlotIndex < 0 || equippedSlotIndex >= Inventory.TOTAL_SLOTS) {
+            return null;
+        }
+        return inventory.get(equippedSlotIndex);
+    }
+
     public ItemStack getCursorStack() {
         return cursorStack;
     }
@@ -189,11 +209,24 @@ public final class InventorySystem {
         return groundItems;
     }
 
+    private void updateEquippedFromSelection() {
+        if (selectedSlotIndex < 0 || selectedSlotIndex >= Inventory.HOTBAR_SLOTS) {
+            equippedSlotIndex = -1;
+            return;
+        }
+        ItemStack stack = inventory.get(selectedSlotIndex);
+        if (stack == null || !itemRegistry.isEquippable(stack.itemId())) {
+            equippedSlotIndex = -1;
+            return;
+        }
+        equippedSlotIndex = selectedSlotIndex;
+    }
+
     private ItemStack mergeIntoCursor(ItemStack stack) {
         if (cursorStack == null) {
             return stack;
         }
-        if (!cursorStack.itemId().equals(stack.itemId())) {
+        if (!cursorStack.canStackWith(stack)) {
             return stack;
         }
         int max = itemRegistry.maxStackSize(cursorStack.itemId());

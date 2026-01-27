@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -57,6 +58,7 @@ public final class WorldRenderer {
 
         renderTileFill(grid, tileSize, visible);
         renderGridLines(tileSize, visible);
+        renderRoomCorners(grid, tileSize, visible);
 
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
@@ -172,26 +174,8 @@ public final class WorldRenderer {
     }
 
     private Color colorFor(TileMaterial material, RoomType roomType, int parity) {
-        Color base = material.colorForParity(parity);
-        if (roomType == RoomType.SAFE) {
-            float t = 0.45f;
-            return tempColor.set(
-                    SAFE_TINT.r * (1f - t) + base.r * t,
-                    SAFE_TINT.g * (1f - t) + base.g * t,
-                    SAFE_TINT.b * (1f - t) + base.b * t,
-                    1f
-            );
-        }
-        if (roomType == RoomType.DANGER) {
-            float t = 0.35f;
-            return tempColor.set(
-                    DANGER_TINT.r * (1f - t) + base.r * t,
-                    DANGER_TINT.g * (1f - t) + base.g * t,
-                    DANGER_TINT.b * (1f - t) + base.b * t,
-                    1f
-            );
-        }
-        return tempColor.set(base);
+        // RoomType no longer tints fill; only corners use it.
+        return tempColor.set(material.colorForParity(parity));
     }
 
     private record VisibleWindow(int minTileX, int minTileY, int maxTileX, int maxTileY) {
@@ -210,5 +194,46 @@ public final class WorldRenderer {
             int maxTileY = (int) Math.ceil(maxWorldY / tileSize) + 2;
             return new VisibleWindow(minTileX, minTileY, maxTileX, maxTileY);
         }
+    }
+
+    private void renderRoomCorners(Grid grid, float tileSize, VisibleWindow visible) {
+        List<Room> rooms = grid.getRoomsInArea(
+                visible.minTileX - 2,
+                visible.minTileY - 2,
+                visible.maxTileX + 2,
+                visible.maxTileY + 2
+        );
+        if (rooms.isEmpty()) {
+            return;
+        }
+
+        float pad = tileSize * 0.18f;
+        float segment = tileSize * 1.15f;
+        float thickness = Math.max(2f, tileSize * 0.12f);
+
+        shapeRenderer.begin(ShapeType.Filled);
+        for (Room room : rooms) {
+            Color tint = room.type == RoomType.SAFE ? SAFE_TINT : DANGER_TINT;
+            shapeRenderer.setColor(tint.r, tint.g, tint.b, 1f);
+
+            float x0 = room.x * tileSize - pad;
+            float y0 = room.y * tileSize - pad;
+            float x1 = x0 + room.width * tileSize + pad * 2f;
+            float y1 = y0 + room.height * tileSize + pad * 2f;
+
+            // Top-left corner
+            shapeRenderer.rect(x0, y1 - thickness, segment, thickness);
+            shapeRenderer.rect(x0, y1 - segment, thickness, segment);
+            // Top-right
+            shapeRenderer.rect(x1 - segment, y1 - thickness, segment, thickness);
+            shapeRenderer.rect(x1 - thickness, y1 - segment, thickness, segment);
+            // Bottom-left
+            shapeRenderer.rect(x0, y0, segment, thickness);
+            shapeRenderer.rect(x0, y0, thickness, segment);
+            // Bottom-right
+            shapeRenderer.rect(x1 - segment, y0, segment, thickness);
+            shapeRenderer.rect(x1 - thickness, y0, thickness, segment);
+        }
+        shapeRenderer.end();
     }
 }

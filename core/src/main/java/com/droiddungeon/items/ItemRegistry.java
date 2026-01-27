@@ -1,5 +1,11 @@
 package com.droiddungeon.items;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Texture;
@@ -7,12 +13,6 @@ import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStackSizer;
-
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     private final Map<String, ItemDefinition> definitions = new HashMap<>();
@@ -47,7 +47,7 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
             }
             String[] parts = line.split(";");
             if (parts.length < 4) {
-                Gdx.app.error("ItemRegistry", "Invalid item line (expected id;name;maxStack;texturePath): " + line);
+                Gdx.app.error("ItemRegistry", "Invalid item line (expected id;name;maxStack;texturePath[;equippable;maxDurability]): " + line);
                 continue;
             }
 
@@ -61,6 +61,22 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
                 continue;
             }
             String texturePath = parts[3].trim();
+            boolean equippable = false;
+            int maxDurability = 0;
+            if (parts.length >= 5) {
+                equippable = Boolean.parseBoolean(parts[4].trim());
+            }
+            if (parts.length >= 6) {
+                try {
+                    maxDurability = Integer.parseInt(parts[5].trim());
+                } catch (NumberFormatException ex) {
+                    Gdx.app.error("ItemRegistry", "Invalid max durability for item " + id + ": " + parts[5]);
+                    maxDurability = 0;
+                }
+                if (maxDurability < 0) {
+                    maxDurability = 0;
+                }
+            }
             if (definitions.containsKey(id)) {
                 Gdx.app.log("ItemRegistry", "Skipping duplicate item id: " + id);
                 continue;
@@ -70,12 +86,22 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
             ownedTextures.add(texture);
 
             TextureRegion region = new TextureRegion(texture);
-            definitions.put(id, new ItemDefinition(id, displayName, maxStack, region));
+            definitions.put(id, new ItemDefinition(id, displayName, maxStack, region, equippable, maxDurability));
         }
     }
 
     public ItemDefinition get(String id) {
         return definitions.get(id);
+    }
+
+    public boolean isEquippable(String id) {
+        ItemDefinition def = definitions.get(id);
+        return def != null && def.equippable();
+    }
+
+    public int maxDurability(String id) {
+        ItemDefinition def = definitions.get(id);
+        return def != null ? def.maxDurability() : 0;
     }
 
     @Override

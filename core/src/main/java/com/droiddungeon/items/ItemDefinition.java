@@ -2,7 +2,14 @@ package com.droiddungeon.items;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
-public record ItemDefinition(String id, String displayName, int maxStackSize, TextureRegion icon) {
+public record ItemDefinition(
+        String id,
+        String displayName,
+        int maxStackSize,
+        TextureRegion icon,
+        boolean equippable,
+        int maxDurability
+) {
     public ItemDefinition {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("id must not be blank");
@@ -15,6 +22,9 @@ public record ItemDefinition(String id, String displayName, int maxStackSize, Te
         }
         if (icon == null) {
             throw new IllegalArgumentException("icon must not be null");
+        }
+        if (maxDurability < 0) {
+            throw new IllegalArgumentException("maxDurability must be >= 0");
         }
     }
 }

@@ -3,6 +3,8 @@ package com.droiddungeon.grid;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Infinite, chunk-backed tile field. Chunks are generated lazily via {@link DungeonGenerator.ChunkGenerator}
@@ -113,5 +115,33 @@ public final class Grid {
     public int getMaxGeneratedY() {
         return maxGeneratedY;
     }
-}
 
+    /**
+     * Returns rooms whose bounding boxes intersect the supplied tile bounds (inclusive).
+     * Chunks covering the area will be generated on demand.
+     */
+    public List<DungeonGenerator.Room> getRoomsInArea(int minX, int minY, int maxX, int maxY) {
+        int chunkSize = chunkGenerator.chunkSize();
+        int minChunkX = Math.floorDiv(minX, chunkSize);
+        int maxChunkX = Math.floorDiv(maxX, chunkSize);
+        int minChunkY = Math.floorDiv(minY, chunkSize);
+        int maxChunkY = Math.floorDiv(maxY, chunkSize);
+
+        List<DungeonGenerator.Room> result = new ArrayList<>();
+        for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+            for (int cy = minChunkY; cy <= maxChunkY; cy++) {
+                DungeonGenerator.Chunk chunk = ensureChunk(cx, cy);
+                for (DungeonGenerator.Room room : chunk.rooms()) {
+                    if (room.x + room.width < minX || room.x > maxX) {
+                        continue;
+                    }
+                    if (room.y + room.height < minY || room.y > maxY) {
+                        continue;
+                    }
+                    result.add(room);
+                }
+            }
+        }
+        return result;
+    }
+}

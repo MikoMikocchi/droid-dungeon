@@ -232,7 +232,12 @@ public final class HudRenderer {
         }
 
         Vector2 world = viewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
-        tooltipText = def.displayName();
+        if (def.maxDurability() > 0) {
+            int current = Math.min(stack.durability(), def.maxDurability());
+            tooltipText = def.displayName() + "\nDurability: " + current + "/" + def.maxDurability();
+        } else {
+            tooltipText = def.displayName();
+        }
         glyphLayout.setText(font, tooltipText);
 
         tooltipPaddingX = 8f;
