@@ -47,14 +47,14 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private int selectedSlotIndex;
     private List<GroundItem> groundItems;
 
-    private float cameraLerp = 6f;
-    private float cameraZoom = 1f;
+    private final float cameraLerp = 6f;
+    private final float cameraZoom = 1f;
     private int companionGridX;
     private int companionGridY;
     private float companionRenderX;
     private float companionRenderY;
     private final int companionDelayTiles = 3;
-    private float companionSpeedTilesPerSecond = 12f;
+    private final float companionSpeedTilesPerSecond = 12f;
     private final Deque<int[]> followerTrail = new ArrayDeque<>();
     private int lastPlayerGridX;
     private int lastPlayerGridY;

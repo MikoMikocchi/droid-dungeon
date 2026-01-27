@@ -197,7 +197,10 @@ public final class DungeonGenerator {
     }
 
     private void carveColumn(Grid grid, int x, int centerY) {
-        for (int offset = -(corridorWidth / 2); offset <= corridorWidth / 2; offset++) {
+        int half = corridorWidth / 2;
+        int startOffset = -half;
+        int endOffset = (half - 1);
+        for (int offset = startOffset; offset <= endOffset; offset++) {
             int y = centerY + offset;
             if (grid.isInside(x, y)) {
                 grid.setTileMaterial(x, y, TileMaterial.STONE);
