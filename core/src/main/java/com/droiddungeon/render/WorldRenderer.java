@@ -36,6 +36,8 @@ public final class WorldRenderer {
 
     public void render(
             Viewport viewport,
+            float gridOriginX,
+            float gridOriginY,
             Grid grid,
             Player player,
             List<GroundItem> groundItems,
@@ -47,8 +49,6 @@ public final class WorldRenderer {
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
         spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        float gridOriginX = (viewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
-        float gridOriginY = (viewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
         float tileSize = grid.getTileSize();
 
         renderTileFill(grid, gridOriginX, gridOriginY, tileSize);

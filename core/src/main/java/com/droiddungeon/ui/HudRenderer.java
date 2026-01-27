@@ -43,15 +43,6 @@ public final class HudRenderer {
     private float tooltipTextWidth;
     private float tooltipTextHeight;
 
-    private boolean debugVisible;
-    private String debugTextCached;
-    private float debugX;
-    private float debugY;
-    private float debugPaddingX;
-    private float debugPaddingY;
-    private float debugTextWidth;
-    private float debugTextHeight;
-
     public HudRenderer() {
         font = RenderAssets.font(14);
         whiteRegion = RenderAssets.whiteRegion();
@@ -65,12 +56,7 @@ public final class HudRenderer {
             boolean inventoryOpen,
             int selectedSlotIndex,
             int hoveredSlotIndex,
-            float deltaSeconds,
-            String debugText,
-            Grid grid,
-            Player player,
-            float companionX,
-            float companionY
+            float deltaSeconds
     ) {
         stage.getViewport().apply();
         shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
@@ -79,15 +65,13 @@ public final class HudRenderer {
         cacheLayout(stage, inventoryOpen);
 
         updateTooltipData(stage, inventory, itemRegistry, hoveredSlotIndex);
-        updateDebugData(stage, debugText);
 
-        renderShapes(stage, inventory, inventoryOpen, selectedSlotIndex, grid, player, companionX, companionY);
+        renderShapes(stage, inventory, inventoryOpen, selectedSlotIndex);
 
         spriteBatch.begin();
         renderSlotContents(inventory, itemRegistry);
         renderTooltipText();
         renderCursorStack(stage, itemRegistry, cursorStack);
-        renderDebugText();
         spriteBatch.end();
     }
 
@@ -103,11 +87,7 @@ public final class HudRenderer {
             Stage stage,
             Inventory inventory,
             boolean inventoryOpen,
-            int selectedSlotIndex,
-            Grid grid,
-            Player player,
-            float companionX,
-            float companionY
+            int selectedSlotIndex
     ) {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -118,13 +98,10 @@ public final class HudRenderer {
         }
         renderSlotGridFilled(inventory, selectedSlotIndex);
         renderTooltipBoxFilled();
-        renderDebugBoxFilled();
-        renderMinimapFilled(stage, grid, player, companionX, companionY);
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeType.Line);
         renderSlotGridOutline();
-        renderMinimapOutline(stage, grid, player, companionX, companionY);
         shapeRenderer.end();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -322,134 +299,6 @@ public final class HudRenderer {
 
         font.setColor(Color.WHITE);
         font.draw(batch, text, Math.round(x), Math.round(y));
-    }
-
-    private void updateDebugData(Stage stage, String text) {
-        debugVisible = false;
-        debugTextCached = null;
-        if (text == null || text.isEmpty()) {
-            return;
-        }
-        debugTextCached = text;
-        glyphLayout.setText(font, debugTextCached);
-
-        debugPaddingX = 8f;
-        debugPaddingY = 6f;
-        debugTextWidth = glyphLayout.width;
-        debugTextHeight = glyphLayout.height;
-        float margin = 10f;
-        float boxWidth = debugTextWidth + debugPaddingX * 2f;
-        float boxHeight = debugTextHeight + debugPaddingY * 2f;
-
-        debugX = margin;
-        debugY = stage.getViewport().getWorldHeight() - margin - boxHeight;
-        debugVisible = true;
-    }
-
-    private void renderDebugBoxFilled() {
-        if (!debugVisible) {
-            return;
-        }
-        float boxWidth = debugTextWidth + debugPaddingX * 2f;
-        float boxHeight = debugTextHeight + debugPaddingY * 2f;
-        shapeRenderer.setColor(0f, 0f, 0f, 0.7f);
-        shapeRenderer.rect(debugX, debugY, boxWidth, boxHeight);
-        shapeRenderer.setColor(0.35f, 0.35f, 0.4f, 0.9f);
-        shapeRenderer.rect(debugX, debugY, boxWidth, 2f);
-        shapeRenderer.rect(debugX, debugY, 2f, boxHeight);
-        shapeRenderer.rect(debugX + boxWidth - 2f, debugY, 2f, boxHeight);
-        shapeRenderer.rect(debugX, debugY + boxHeight - 2f, boxWidth, 2f);
-    }
-
-    private void renderDebugText() {
-        if (!debugVisible) {
-            return;
-        }
-        font.setColor(Color.WHITE);
-        font.draw(spriteBatch, debugTextCached, debugX + debugPaddingX, debugY + debugPaddingY + debugTextHeight);
-    }
-
-    private void renderMinimapFilled(Stage stage, Grid grid, Player player, float companionX, float companionY) {
-        if (grid == null || player == null) {
-            return;
-        }
-
-        float viewportWidth = stage.getViewport().getWorldWidth();
-        float viewportHeight = stage.getViewport().getWorldHeight();
-
-        // Keep the minimap compact and anchored to the top-right corner.
-        float margin = 12f;
-        float maxWidth = 240f;
-        float maxHeight = 170f;
-        float tile = Math.min(maxWidth / grid.getColumns(), maxHeight / grid.getRows());
-        tile = Math.max(2f, tile);
-
-        float mapWidth = tile * grid.getColumns();
-        float mapHeight = tile * grid.getRows();
-        float originX = viewportWidth - margin - mapWidth;
-        float originY = viewportHeight - margin - mapHeight;
-
-        float pad = 6f;
-
-        // Background
-        shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
-        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
-
-        // Tiles
-        for (int y = 0; y < grid.getRows(); y++) {
-            for (int x = 0; x < grid.getColumns(); x++) {
-                float drawX = originX + x * tile;
-                float drawY = originY + y * tile;
-                Color color = grid.getTileMaterial(x, y).darkColor();
-                // Slightly desaturate and brighten for readability at small scale.
-                float r = 0.18f + color.r * 0.75f;
-                float g = 0.18f + color.g * 0.75f;
-                float b = 0.18f + color.b * 0.75f;
-                shapeRenderer.setColor(r, g, b, 0.95f);
-                shapeRenderer.rect(drawX, drawY, tile, tile);
-            }
-        }
-
-        // Player marker
-        float playerX = originX + (player.getRenderX() + 0.5f) * tile;
-        float playerY = originY + (player.getRenderY() + 0.5f) * tile;
-        float markerSize = Math.max(3f, tile * 0.55f);
-        float halfMarker = markerSize * 0.5f;
-        shapeRenderer.setColor(0.98f, 0.86f, 0.3f, 1f);
-        shapeRenderer.rect(playerX - halfMarker, playerY - halfMarker, markerSize, markerSize);
-
-        // Companion marker
-        float companionWorldX = originX + (companionX + 0.5f) * tile;
-        float companionWorldY = originY + (companionY + 0.5f) * tile;
-        float companionSize = Math.max(3f, tile * 0.45f);
-        float halfCompanion = companionSize * 0.5f;
-        shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
-        shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
-    }
-
-    private void renderMinimapOutline(Stage stage, Grid grid, Player player, float companionX, float companionY) {
-        if (grid == null || player == null) {
-            return;
-        }
-
-        float viewportWidth = stage.getViewport().getWorldWidth();
-        float viewportHeight = stage.getViewport().getWorldHeight();
-
-        float margin = 12f;
-        float maxWidth = 240f;
-        float maxHeight = 170f;
-        float tile = Math.min(maxWidth / grid.getColumns(), maxHeight / grid.getRows());
-        tile = Math.max(2f, tile);
-
-        float mapWidth = tile * grid.getColumns();
-        float mapHeight = tile * grid.getRows();
-        float originX = viewportWidth - margin - mapWidth;
-        float originY = viewportHeight - margin - mapHeight;
-
-        float pad = 6f;
-
-        shapeRenderer.setColor(0.4f, 0.4f, 0.44f, 1f);
-        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
     }
 
     public int hitTestSlot(Stage stage, float screenX, float screenY, boolean inventoryOpen) {

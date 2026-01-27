@@ -10,6 +10,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.config.GameConfig;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -22,8 +23,10 @@ import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.render.WorldRenderer;
+import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.InventorySystem;
+import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 
 public class DroidDungeonGame extends ApplicationAdapter {
@@ -32,7 +35,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private OrthographicCamera worldCamera;
     private WorldRenderer worldRenderer;
     private HudRenderer hudRenderer;
+    private DebugOverlay debugOverlay;
     private HeldMovementController movementController;
+    private CameraController cameraController;
 
     private Grid grid;
     private Player player;
@@ -41,27 +46,26 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
 
-    private final float cameraLerp = 6f;
-    private final float cameraZoom = 1f;
     private CompanionSystem companionSystem;
+    private GameConfig config;
 
     @Override
     public void create() {
+        config = GameConfig.defaults();
         stage = new Stage(new ScreenViewport()); // UI stage
         worldCamera = new OrthographicCamera();
         worldViewport = new ScreenViewport(worldCamera);
+        cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
         long seed = TimeUtils.millis();
-        int columns = 80;
-        int rows = 60;
-        float tileSize = 48f;
-        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generate(columns, rows, tileSize, seed);
+        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generate(config.columns(), config.rows(), config.tileSize(), seed);
         grid = layout.grid();
         player = new Player(layout.spawnX(), layout.spawnY());
-        companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), 3, 12f);
+        companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
 
         worldRenderer = new WorldRenderer();
         hudRenderer = new HudRenderer();
+        debugOverlay = new DebugOverlay();
         movementController = new HeldMovementController();
 
         inventory = new Inventory();
@@ -75,7 +79,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
     @Override
     public void resize(int width, int height) {
         stage.getViewport().update(width, height, true);
-        worldViewport.update(width, height, true);
+        cameraController.resize(width, height);
     }
 
     @Override
@@ -110,16 +114,17 @@ public class DroidDungeonGame extends ApplicationAdapter {
             movementController.update(grid, player);
         }
         companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
-        player.update(delta, 10f);
+        player.update(delta, config.playerSpeedTilesPerSecond());
         companionSystem.updateRender(delta);
 
-        float gridOriginX = (worldViewport.getWorldWidth() - grid.getWorldWidth()) * 0.5f;
-        float gridOriginY = (worldViewport.getWorldHeight() - grid.getWorldHeight()) * 0.5f;
-        updateCamera(delta, gridOriginX, gridOriginY);
+        cameraController.update(grid, player, delta);
+        float gridOriginX = cameraController.getGridOriginX();
+        float gridOriginY = cameraController.getGridOriginY();
 
-        worldRenderer.render(worldViewport, grid, player, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
+        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(stage, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, debugText, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY());
+        hudRenderer.render(stage, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta);
+        debugOverlay.render(stage, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
     }
 
     @Override
@@ -127,6 +132,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         stage.dispose();
         worldRenderer.dispose();
         hudRenderer.dispose();
+        debugOverlay.dispose();
         RenderAssets.dispose();
         itemRegistry.dispose();
     }
@@ -136,19 +142,6 @@ public class DroidDungeonGame extends ApplicationAdapter {
         int dropX = Math.min(grid.getColumns() - 1, player.getGridX() + 1);
         int dropY = player.getGridY();
         inventorySystem.addGroundStack(dropX, dropY, new ItemStack("test_chip", 5));
-    }
-
-    private void updateCamera(float deltaSeconds, float gridOriginX, float gridOriginY) {
-        OrthographicCamera camera = worldCamera;
-        float tileSize = grid.getTileSize();
-        float targetX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
-        float targetY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
-
-        float lerp = 1f - (float) Math.exp(-cameraLerp * deltaSeconds);
-        camera.position.x += (targetX - camera.position.x) * lerp;
-        camera.position.y += (targetY - camera.position.y) * lerp;
-        camera.zoom = cameraZoom;
-        camera.update();
     }
 
     private String buildDebugText(float gridOriginX, float gridOriginY) {
