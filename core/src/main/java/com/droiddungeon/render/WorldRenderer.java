@@ -66,7 +66,6 @@ public final class WorldRenderer {
             float companionX,
             float companionY
     ) {
-        // Keep the camera position set by the game (no recentering) while ensuring GL viewport is correct.
         viewport.apply(false);
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
         spriteBatch.setProjectionMatrix(viewport.getCamera().combined);

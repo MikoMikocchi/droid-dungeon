@@ -16,6 +16,8 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.droiddungeon.grid.Grid;
+import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
@@ -60,7 +62,11 @@ public final class HudRenderer {
             int selectedSlotIndex,
             int hoveredSlotIndex,
             float deltaSeconds,
-            String debugText
+            String debugText,
+            Grid grid,
+            Player player,
+            float companionX,
+            float companionY
     ) {
         stage.getViewport().apply();
         shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
@@ -77,6 +83,7 @@ public final class HudRenderer {
         renderTooltip(stage, inventory, itemRegistry, hoveredSlotIndex);
         renderCursorStack(stage, itemRegistry, cursorStack);
         renderDebugBox(stage, debugText);
+        renderMinimap(stage, grid, player, companionX, companionY);
     }
 
     private void cacheLayout(Stage stage, boolean inventoryOpen) {
@@ -313,6 +320,77 @@ public final class HudRenderer {
         font.setColor(Color.WHITE);
         font.draw(spriteBatch, glyphLayout, x + paddingX, y + paddingY + glyphLayout.height);
         spriteBatch.end();
+    }
+
+    private void renderMinimap(Stage stage, Grid grid, Player player, float companionX, float companionY) {
+        if (grid == null || player == null) {
+            return;
+        }
+
+        float viewportWidth = stage.getViewport().getWorldWidth();
+        float viewportHeight = stage.getViewport().getWorldHeight();
+
+        // Keep the minimap compact and anchored to the top-right corner.
+        float margin = 12f;
+        float maxWidth = 240f;
+        float maxHeight = 170f;
+        float tile = Math.min(maxWidth / grid.getColumns(), maxHeight / grid.getRows());
+        tile = Math.max(2f, tile);
+
+        float mapWidth = tile * grid.getColumns();
+        float mapHeight = tile * grid.getRows();
+        float originX = viewportWidth - margin - mapWidth;
+        float originY = viewportHeight - margin - mapHeight;
+
+        float pad = 6f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        // Background
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
+        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
+
+        // Tiles
+        for (int y = 0; y < grid.getRows(); y++) {
+            for (int x = 0; x < grid.getColumns(); x++) {
+                float drawX = originX + x * tile;
+                float drawY = originY + y * tile;
+                Color color = grid.getTileMaterial(x, y).darkColor();
+                // Slightly desaturate and brighten for readability at small scale.
+                float r = 0.18f + color.r * 0.75f;
+                float g = 0.18f + color.g * 0.75f;
+                float b = 0.18f + color.b * 0.75f;
+                shapeRenderer.setColor(r, g, b, 0.95f);
+                shapeRenderer.rect(drawX, drawY, tile, tile);
+            }
+        }
+
+        // Player marker
+        float playerX = originX + (player.getRenderX() + 0.5f) * tile;
+        float playerY = originY + (player.getRenderY() + 0.5f) * tile;
+        float markerSize = Math.max(3f, tile * 0.55f);
+        float halfMarker = markerSize * 0.5f;
+        shapeRenderer.setColor(0.98f, 0.86f, 0.3f, 1f);
+        shapeRenderer.rect(playerX - halfMarker, playerY - halfMarker, markerSize, markerSize);
+
+        // Companion marker
+        float companionWorldX = originX + (companionX + 0.5f) * tile;
+        float companionWorldY = originY + (companionY + 0.5f) * tile;
+        float companionSize = Math.max(3f, tile * 0.45f);
+        float halfCompanion = companionSize * 0.5f;
+        shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
+        shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
+        shapeRenderer.end();
+
+        // Border
+        shapeRenderer.begin(ShapeType.Line);
+        shapeRenderer.setColor(0.4f, 0.4f, 0.44f, 1f);
+        shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
+        shapeRenderer.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private BitmapFont loadFont() {

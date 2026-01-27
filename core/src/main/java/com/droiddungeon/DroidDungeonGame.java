@@ -1,5 +1,11 @@
 package com.droiddungeon;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
+
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -7,27 +13,21 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.badlogic.gdx.utils.TimeUtils;
+import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
-import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
-import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.items.ItemDefinition;
+import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.ui.HudRenderer;
-
-import java.util.ArrayList;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.List;
 
 public class DroidDungeonGame extends ApplicationAdapter {
     private Stage stage;
@@ -48,7 +48,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private List<GroundItem> groundItems;
 
     private float cameraLerp = 6f;
-    private float cameraZoom = 1.25f;
+    private float cameraZoom = 1f;
     private int companionGridX;
     private int companionGridY;
     private float companionRenderX;
@@ -159,7 +159,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         worldRenderer.render(worldViewport, grid, player, groundItems, itemRegistry, companionRenderX, companionRenderY);
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText);
+        hudRenderer.render(stage, inventory, itemRegistry, cursorStack, inventoryOpen, selectedSlotIndex, hoveredSlot, delta, debugText, grid, player, companionRenderX, companionRenderY);
     }
 
     @Override
