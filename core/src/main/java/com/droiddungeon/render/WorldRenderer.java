@@ -2,13 +2,16 @@ package com.droiddungeon.render;
 
 import java.util.List;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
@@ -18,6 +21,7 @@ import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.systems.WeaponSystem.WeaponState;
 
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -44,6 +48,7 @@ public final class WorldRenderer {
             float gridOriginY,
             Grid grid,
             Player player,
+            WeaponState weaponState,
             List<GroundItem> groundItems,
             ItemRegistry itemRegistry,
             float companionX,
@@ -59,6 +64,7 @@ public final class WorldRenderer {
         renderTileFill(grid, tileSize, visible);
         renderGridLines(tileSize, visible);
         renderRoomCorners(grid, tileSize, visible);
+        renderWeaponFan(weaponState, player, gridOriginX, gridOriginY, tileSize);
 
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
@@ -77,6 +83,179 @@ public final class WorldRenderer {
 
         spriteBatch.draw(doroRegion, drawX, drawY, drawSize, drawSize);
     }
+
+    private void renderWeaponFan(WeaponState weaponState, Player player, float gridOriginX, float gridOriginY, float tileSize) {
+        if (weaponState == null || !weaponState.active()) {
+            return;
+        }
+
+        float centerX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
+        float centerY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
+        float outerRadius = weaponState.reachTiles() * tileSize;
+        float innerRadius = weaponState.innerHoleTiles() * tileSize;
+        if (outerRadius <= 0f || outerRadius <= innerRadius) {
+            return;
+        }
+
+        float swingScale = weaponState.swinging() ? MathUtils.lerp(1f, 1.08f, weaponState.swingProgress()) : 1f;
+        outerRadius *= swingScale;
+
+        float startAngle = weaponState.aimAngleRad() - weaponState.arcRad() * 0.5f;
+
+        float cooldownFactor = 1f - MathUtils.clamp(weaponState.cooldownRatio(), 0f, 1f);
+        float baseAlpha = MathUtils.lerp(0.16f, 0.32f, cooldownFactor);
+        if (weaponState.swinging()) {
+            baseAlpha = Math.max(baseAlpha, 0.44f);
+        }
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        Gdx.gl.glEnable(GL20.GL_STENCIL_TEST);
+        Gdx.gl.glClear(GL20.GL_STENCIL_BUFFER_BIT);
+        Gdx.gl.glStencilMask(0xFF);
+        Gdx.gl.glStencilFunc(GL20.GL_ALWAYS, 1, 0xFF);
+        Gdx.gl.glStencilOp(GL20.GL_KEEP, GL20.GL_KEEP, GL20.GL_REPLACE);
+
+        int fillSegments = Math.max(32, Math.round(weaponState.arcRad() * MathUtils.radDeg));
+
+        // Write mask only.
+        Gdx.gl.glColorMask(false, false, false, false);
+        shapeRenderer.begin(ShapeType.Filled);
+        drawFan(shapeRenderer, centerX, centerY, innerRadius, outerRadius, startAngle, weaponState.arcRad(), fillSegments);
+        shapeRenderer.end();
+
+        // Enable color writes and only draw where mask == 1.
+        Gdx.gl.glColorMask(true, true, true, true);
+        Gdx.gl.glStencilFunc(GL20.GL_EQUAL, 1, 0xFF);
+        Gdx.gl.glStencilOp(GL20.GL_KEEP, GL20.GL_KEEP, GL20.GL_KEEP);
+
+        // Base fill for the whole fan.
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0.62f, 0.78f, 1f, baseAlpha);
+        drawFan(shapeRenderer, centerX, centerY, innerRadius, outerRadius, startAngle, weaponState.arcRad(), fillSegments);
+        shapeRenderer.end();
+
+        // Diagonal overlay stripes that do not rotate with the fan orientation, clipped to the fan wedge.
+        float stripeSpacing = tileSize * 0.42f;
+        float stripeThickness = Math.max(3.4f, tileSize * 0.18f);
+        float diagAngle = MathUtils.PI / 4f; // 45° world-space
+        float dx = MathUtils.cos(diagAngle);
+        float dy = MathUtils.sin(diagAngle);
+        float nx = -dy;
+        float ny = dx;
+
+        int kMax = (int) Math.ceil(outerRadius / stripeSpacing);
+        shapeRenderer.begin(ShapeType.Filled);
+        for (int k = -kMax; k <= kMax; k++) {
+            float offset = k * stripeSpacing;
+            float segAlpha = baseAlpha * 0.75f * ((k & 1) == 0 ? 1f : 0.86f);
+            if (weaponState.swinging()) {
+                segAlpha = Math.min(0.9f, segAlpha + 0.12f);
+            }
+            shapeRenderer.setColor(0.55f, 0.72f, 0.96f, segAlpha);
+
+            // Draw a long stripe line; stencil will clip it to the fan, hiding endpoints.
+            float halfLen = outerRadius * 3f;
+            float cx = centerX + offset * nx;
+            float cy = centerY + offset * ny;
+            float x0 = cx - dx * halfLen;
+            float y0 = cy - dy * halfLen;
+            float x1 = cx + dx * halfLen;
+            float y1 = cy + dy * halfLen;
+            shapeRenderer.rectLine(x0, y0, x1, y1, stripeThickness);
+        }
+        shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeType.Line);
+        float outlineAlpha = MathUtils.clamp(baseAlpha + 0.18f, 0f, 0.85f);
+        shapeRenderer.setColor(0.82f, 0.9f, 1f, outlineAlpha);
+
+        float prevX = centerX + outerRadius * MathUtils.cos(startAngle);
+        float prevY = centerY + outerRadius * MathUtils.sin(startAngle);
+        int outlineSegments = Math.max(40, fillSegments);
+        for (int i = 1; i <= outlineSegments; i++) {
+            float a = startAngle + weaponState.arcRad() * i / outlineSegments;
+            float x = centerX + outerRadius * MathUtils.cos(a);
+            float y = centerY + outerRadius * MathUtils.sin(a);
+            shapeRenderer.line(prevX, prevY, x, y);
+            prevX = x;
+            prevY = y;
+        }
+        shapeRenderer.line(centerX, centerY, centerX + outerRadius * MathUtils.cos(startAngle), centerY + outerRadius * MathUtils.sin(startAngle));
+        shapeRenderer.line(centerX, centerY, centerX + outerRadius * MathUtils.cos(startAngle + weaponState.arcRad()), centerY + outerRadius * MathUtils.sin(startAngle + weaponState.arcRad()));
+        shapeRenderer.end();
+
+        float cd = MathUtils.clamp(weaponState.cooldownRatio(), 0f, 1f);
+        if (cd > 0f) {
+            float readyProgress = 1f - cd; // 0 -> just started cooldown, 1 -> ready
+            float cdRadius = innerRadius + (outerRadius - innerRadius) * readyProgress;
+            float cdAlpha = MathUtils.lerp(0.5f, 0.25f, readyProgress); // fade as it fills
+            shapeRenderer.setColor(1f, 1f, 1f, cdAlpha);
+
+            shapeRenderer.begin(ShapeType.Filled);
+            int cdSegments = Math.max(32, Math.round(weaponState.arcRad() * MathUtils.radDeg));
+            for (int i = 0; i < cdSegments; i++) {
+                float a0 = startAngle + weaponState.arcRad() * (i / (float) cdSegments);
+                float a1 = startAngle + weaponState.arcRad() * ((i + 1f) / cdSegments);
+
+                float c0 = MathUtils.cos(a0);
+                float s0 = MathUtils.sin(a0);
+                float c1 = MathUtils.cos(a1);
+                float s1 = MathUtils.sin(a1);
+
+                float x0 = centerX + innerRadius * c0;
+                float y0 = centerY + innerRadius * s0;
+                float x1 = centerX + cdRadius * c0;
+                float y1 = centerY + cdRadius * s0;
+                float x2 = centerX + innerRadius * c1;
+                float y2 = centerY + innerRadius * s1;
+                float x3 = centerX + cdRadius * c1;
+                float y3 = centerY + cdRadius * s1;
+
+                shapeRenderer.triangle(x0, y0, x1, y1, x2, y2);
+                shapeRenderer.triangle(x2, y2, x1, y1, x3, y3);
+            }
+            shapeRenderer.end();
+        }
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+        Gdx.gl.glDisable(GL20.GL_STENCIL_TEST);
+    }
+
+
+    private void drawFan(
+            ShapeRenderer renderer,
+            float centerX,
+            float centerY,
+            float innerRadius,
+            float outerRadius,
+            float startAngle,
+            float arcRad,
+            int segments
+    ) {
+        for (int i = 0; i < segments; i++) {
+            float a0 = startAngle + arcRad * (i / (float) segments);
+            float a1 = startAngle + arcRad * ((i + 1f) / segments);
+
+            float c0 = MathUtils.cos(a0);
+            float s0 = MathUtils.sin(a0);
+            float c1 = MathUtils.cos(a1);
+            float s1 = MathUtils.sin(a1);
+
+            float x0 = centerX + innerRadius * c0;
+            float y0 = centerY + innerRadius * s0;
+            float x1 = centerX + outerRadius * c0;
+            float y1 = centerY + outerRadius * s0;
+            float x2 = centerX + innerRadius * c1;
+            float y2 = centerY + innerRadius * s1;
+            float x3 = centerX + outerRadius * c1;
+            float y3 = centerY + outerRadius * s1;
+
+            renderer.triangle(x0, y0, x1, y1, x2, y2);
+            renderer.triangle(x2, y2, x1, y1, x3, y3);
+        }
+    }
+
 
     private void renderTileFill(Grid grid, float tileSize, VisibleWindow visible) {
         shapeRenderer.begin(ShapeType.Filled);

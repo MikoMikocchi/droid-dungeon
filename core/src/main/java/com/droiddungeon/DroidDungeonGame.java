@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
@@ -25,6 +26,7 @@ import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.InventorySystem;
+import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 
@@ -47,6 +49,8 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private InventorySystem inventorySystem;
 
     private CompanionSystem companionSystem;
+    private WeaponSystem weaponSystem;
+    private WeaponSystem.WeaponState weaponState;
     private GameConfig config;
 
     @Override
@@ -72,6 +76,16 @@ public class DroidDungeonGame extends ApplicationAdapter {
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
+        weaponSystem = new WeaponSystem();
+        weaponSystem.register("steel_rapier", new WeaponSystem.WeaponSpec(
+                MathUtils.degreesToRadians * 20f,
+                3.4f,
+                0.42f,
+                0.22f,
+                0.55f,
+                12f
+        ));
+        weaponState = weaponSystem.getState();
         seedDemoItems();
 
         // Input is handled by polling (for held-key movement)
@@ -98,17 +112,12 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
         float delta = Gdx.graphics.getDeltaTime();
 
-        int hoveredSlot = -1;
-        if (inventorySystem.isInventoryOpen()) {
-            hoveredSlot = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), true);
+        int slotUnderCursor = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
+        int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
+        if (Gdx.input.justTouched() && slotUnderCursor != -1) {
+            inventorySystem.onSlotClicked(slotUnderCursor);
         }
-
-        if (Gdx.input.justTouched()) {
-            int clicked = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
-            if (clicked != -1) {
-                inventorySystem.onSlotClicked(clicked);
-            }
-        }
+        boolean pointerOnUi = slotUnderCursor != -1;
 
         if (!inventorySystem.isInventoryOpen()) {
             movementController.update(grid, player);
@@ -121,7 +130,19 @@ public class DroidDungeonGame extends ApplicationAdapter {
         float gridOriginX = cameraController.getGridOriginX();
         float gridOriginY = cameraController.getGridOriginY();
 
-        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
+        weaponState = weaponSystem.update(
+                delta,
+                player,
+                inventorySystem.getEquippedStack(),
+                worldViewport,
+                gridOriginX,
+                gridOriginY,
+                grid.getTileSize(),
+                inventorySystem.isInventoryOpen(),
+                pointerOnUi
+        );
+
+        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
         hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta);
         debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
