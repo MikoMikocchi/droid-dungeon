@@ -84,15 +84,40 @@ public final class InventorySystem {
             if (!groundItem.isAt(playerX, playerY)) {
                 continue;
             }
-            ItemStack stack = groundItem.getStack();
-            ItemStack remaining = mergeIntoCursor(stack);
-            if (remaining != null) {
-                remaining = inventory.add(remaining, itemRegistry);
-            }
-            if (remaining == null) {
+            if (groundItem.isBundle()) {
+                List<ItemStack> leftovers = new ArrayList<>();
+                for (ItemStack item : groundItem.getBundledItems()) {
+                    ItemStack remaining = mergeIntoCursor(item);
+                    if (remaining != null) {
+                        remaining = inventory.add(remaining, itemRegistry);
+                    }
+                    if (remaining != null) {
+                        leftovers.add(remaining);
+                    }
+                }
+
+                ItemStack pouchRemain = mergeIntoCursor(groundItem.getStack());
+                if (pouchRemain != null) {
+                    pouchRemain = inventory.add(pouchRemain, itemRegistry);
+                }
+
                 iterator.remove();
-            } else if (remaining.count() != stack.count()) {
-                groundItem.setStack(remaining);
+                if (!leftovers.isEmpty() || pouchRemain != null) {
+                    ItemStack pouchStack = pouchRemain != null ? pouchRemain : groundItem.getStack();
+                    List<ItemStack> remainingContents = leftovers.isEmpty() ? List.of() : leftovers;
+                    groundItems.add(new GroundItem(playerX, playerY, pouchStack, remainingContents));
+                }
+            } else {
+                ItemStack stack = groundItem.getStack();
+                ItemStack remaining = mergeIntoCursor(stack);
+                if (remaining != null) {
+                    remaining = inventory.add(remaining, itemRegistry);
+                }
+                if (remaining == null) {
+                    iterator.remove();
+                } else if (remaining.count() != stack.count()) {
+                    groundItem.setStack(remaining);
+                }
             }
         }
     }
@@ -180,6 +205,36 @@ public final class InventorySystem {
                 remaining = remaining.withCount(remaining.count() - chunk);
             }
         }
+    }
+
+    public void addGroundBundle(int gridX, int gridY, ItemStack pouchStack, List<ItemStack> bundled) {
+        if (pouchStack == null || bundled == null || bundled.isEmpty()) {
+            return;
+        }
+        groundItems.add(new GroundItem(gridX, gridY, pouchStack, bundled));
+    }
+
+    public List<ItemStack> drainAllItems() {
+        List<ItemStack> result = new ArrayList<>();
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack stack = inventory.get(i);
+            if (stack != null) {
+                result.add(stack);
+                inventory.set(i, null);
+            }
+        }
+        if (cursorStack != null) {
+            result.add(cursorStack);
+            cursorStack = null;
+        }
+        selectedSlotIndex = 0;
+        updateEquippedFromSelection();
+        inventoryOpen = false;
+        return result;
+    }
+
+    public void forceCloseInventory() {
+        inventoryOpen = false;
     }
 
     public boolean isInventoryOpen() {

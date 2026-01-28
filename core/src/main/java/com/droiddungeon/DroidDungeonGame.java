@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
@@ -31,6 +32,7 @@ import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
+import java.util.List;
 
 public class DroidDungeonGame extends ApplicationAdapter {
     private Viewport worldViewport;
@@ -48,6 +50,11 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private PlayerStats playerStats;
     private EnemySystem enemySystem;
     private long worldSeed;
+    private int spawnX;
+    private int spawnY;
+    private boolean dead;
+    private int deathGridX;
+    private int deathGridY;
 
     private Inventory inventory;
     private ItemRegistry itemRegistry;
@@ -70,7 +77,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
         worldSeed = TimeUtils.millis();
         DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
         grid = layout.grid();
-        player = new Player(layout.spawnX(), layout.spawnY());
+        spawnX = layout.spawnX();
+        spawnY = layout.spawnY();
+        player = new Player(spawnX, spawnY);
         playerStats = new PlayerStats(100f);
         companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
         enemySystem = new EnemySystem(grid, worldSeed);
@@ -83,16 +92,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
-        weaponSystem = new WeaponSystem();
-        weaponSystem.register("steel_rapier", new WeaponSystem.WeaponSpec(
-                MathUtils.degreesToRadians * 20f,
-                3.4f,
-                0.42f,
-                0.22f,
-                0.55f,
-                12f
-        ));
-        weaponState = weaponSystem.getState();
+        setupWeapons();
         seedDemoItems();
 
         // Input is handled by polling (for held-key movement)
@@ -109,53 +109,83 @@ public class DroidDungeonGame extends ApplicationAdapter {
         Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        inventorySystem.updateInput();
-        if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
-            inventorySystem.dropCurrentStack(player);
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
-            inventorySystem.pickUpItemsAtPlayer(player);
-        }
-
         float delta = Gdx.graphics.getDeltaTime();
         playerStats.update(delta);
-
-        int slotUnderCursor = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
-        int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
-        if (Gdx.input.justTouched() && slotUnderCursor != -1) {
-            inventorySystem.onSlotClicked(slotUnderCursor);
+        if (playerStats.isDead() && !dead) {
+            onPlayerDeath();
         }
-        boolean pointerOnUi = slotUnderCursor != -1;
 
-        if (!inventorySystem.isInventoryOpen()) {
-            movementController.update(grid, player, enemySystem);
+        int slotUnderCursor = -1;
+        int hoveredSlot = -1;
+        boolean pointerOnUi = false;
+
+        if (!dead) {
+            inventorySystem.updateInput();
+            if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+                inventorySystem.dropCurrentStack(player);
+            }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+                inventorySystem.pickUpItemsAtPlayer(player);
+            }
+
+            slotUnderCursor = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
+            hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
+            if (Gdx.input.justTouched() && slotUnderCursor != -1) {
+                inventorySystem.onSlotClicked(slotUnderCursor);
+            }
+            pointerOnUi = slotUnderCursor != -1;
+
+            if (!inventorySystem.isInventoryOpen()) {
+                movementController.update(grid, player, enemySystem);
+            }
+            companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
+            player.update(delta, config.playerSpeedTilesPerSecond());
+            companionSystem.updateRender(delta);
+
+            cameraController.update(grid, player, delta);
+            float gridOriginX = cameraController.getGridOriginX();
+            float gridOriginY = cameraController.getGridOriginY();
+
+            weaponState = weaponSystem.update(
+                    delta,
+                    player,
+                    inventorySystem.getEquippedStack(),
+                    worldViewport,
+                    gridOriginX,
+                    gridOriginY,
+                    grid.getTileSize(),
+                    inventorySystem.isInventoryOpen(),
+                    pointerOnUi
+            );
+
+            enemySystem.update(delta, player, playerStats, weaponState);
+
+            worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, enemySystem.getEnemies(), companionSystem.getRenderX(), companionSystem.getRenderY());
+            String debugText = buildDebugText(gridOriginX, gridOriginY);
+            hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, playerStats);
+            debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
+        } else {
+            cameraController.update(grid, player, delta);
+            float gridOriginX = cameraController.getGridOriginX();
+            float gridOriginY = cameraController.getGridOriginY();
+            weaponState = WeaponSystem.WeaponState.inactive();
+
+            worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, enemySystem.getEnemies(), companionSystem.getRenderX(), companionSystem.getRenderY());
+            String debugText = buildDebugText(gridOriginX, gridOriginY);
+            hudRenderer.render(uiViewport, inventory, itemRegistry, null, false, inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, playerStats);
+            debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
         }
-        companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
-        player.update(delta, config.playerSpeedTilesPerSecond());
-        companionSystem.updateRender(delta);
 
-        cameraController.update(grid, player, delta);
-        float gridOriginX = cameraController.getGridOriginX();
-        float gridOriginY = cameraController.getGridOriginY();
-
-        weaponState = weaponSystem.update(
-                delta,
-                player,
-                inventorySystem.getEquippedStack(),
-                worldViewport,
-                gridOriginX,
-                gridOriginY,
-                grid.getTileSize(),
-                inventorySystem.isInventoryOpen(),
-                pointerOnUi
-        );
-
-        enemySystem.update(delta, player, playerStats, weaponState);
-
-        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, enemySystem.getEnemies(), companionSystem.getRenderX(), companionSystem.getRenderY());
-        String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, playerStats);
-        debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
+        if (dead) {
+            boolean restartHovered = isRestartHovered();
+            if (Gdx.input.justTouched() && restartHovered) {
+                restartRun();
+            }
+            if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+                restartRun();
+            }
+            hudRenderer.renderDeathOverlay(uiViewport, restartHovered);
+        }
     }
 
     @Override
@@ -178,6 +208,47 @@ public class DroidDungeonGame extends ApplicationAdapter {
             inventory.add(new ItemStack("steel_pickaxe", 1, pickaxeDef.maxDurability()), itemRegistry);
         }
         inventorySystem.addGroundStack(player.getGridX() + 1, player.getGridY(), new ItemStack("test_chip", 5));
+    }
+
+    private void setupWeapons() {
+        weaponSystem = new WeaponSystem();
+        weaponSystem.register("steel_rapier", new WeaponSystem.WeaponSpec(
+                MathUtils.degreesToRadians * 20f,
+                3.4f,
+                0.42f,
+                0.22f,
+                0.55f,
+                12f
+        ));
+        weaponState = weaponSystem.getState();
+    }
+
+    private void onPlayerDeath() {
+        dead = true;
+        deathGridX = player.getGridX();
+        deathGridY = player.getGridY();
+        inventorySystem.forceCloseInventory();
+
+        List<ItemStack> loot = inventorySystem.drainAllItems();
+        if (!loot.isEmpty()) {
+            inventorySystem.addGroundBundle(deathGridX, deathGridY, new ItemStack("pouch", 1), loot);
+        }
+    }
+
+    private boolean isRestartHovered() {
+        Rectangle rect = hudRenderer.getRestartButtonBounds(uiViewport);
+        Vector2 world = uiViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        return rect.contains(world);
+    }
+
+    private void restartRun() {
+        dead = false;
+        player = new Player(spawnX, spawnY);
+        playerStats = new PlayerStats(playerStats.getMaxHealth());
+        companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
+        enemySystem = new EnemySystem(grid, worldSeed);
+        setupWeapons();
+        inventorySystem.forceCloseInventory();
     }
 
     private String buildDebugText(float gridOriginX, float gridOriginY) {

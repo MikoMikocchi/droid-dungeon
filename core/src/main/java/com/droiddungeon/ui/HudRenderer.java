@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
@@ -310,11 +311,10 @@ public final class HudRenderer {
         if (stats == null) {
             return;
         }
-        float barWidth = 210f;
+        float barWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
         float barHeight = 18f;
-        float margin = 12f;
-        float x = margin;
-        float y = viewport.getWorldHeight() - margin - barHeight;
+        float x = lastOriginX;
+        float y = lastOriginY + lastRows * (cellSize + gap) + 10f;
 
         float ratio = Math.max(0f, Math.min(1f, stats.getHealthRatio()));
 
@@ -340,6 +340,54 @@ public final class HudRenderer {
         float textY = y + (barHeight + glyphLayout.height) * 0.5f;
         font.setColor(Color.WHITE);
         font.draw(spriteBatch, text, textX, textY);
+        spriteBatch.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    public Rectangle getRestartButtonBounds(Viewport viewport) {
+        float w = 220f;
+        float h = 52f;
+        float x = (viewport.getWorldWidth() - w) * 0.5f;
+        float y = (viewport.getWorldHeight() - h) * 0.32f;
+        return new Rectangle(x, y, w, h);
+    }
+
+    public void renderDeathOverlay(Viewport viewport, boolean restartHovered) {
+        viewport.apply();
+        shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
+        spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
+
+        Rectangle btn = getRestartButtonBounds(viewport);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
+        shapeRenderer.rect(0f, 0f, viewport.getWorldWidth(), viewport.getWorldHeight());
+
+        // Button
+        shapeRenderer.setColor(restartHovered ? new Color(0.32f, 0.65f, 0.9f, 1f) : new Color(0.24f, 0.38f, 0.52f, 1f));
+        shapeRenderer.rect(btn.x, btn.y, btn.width, btn.height);
+        shapeRenderer.setColor(1f, 1f, 1f, 0.25f);
+        shapeRenderer.rect(btn.x, btn.y, btn.width, 4f);
+        shapeRenderer.end();
+
+        spriteBatch.begin();
+        String title = "YOU DIED";
+        glyphLayout.setText(font, title);
+        float titleX = (viewport.getWorldWidth() - glyphLayout.width) * 0.5f;
+        float titleY = btn.y + btn.height + glyphLayout.height + 28f;
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, titleX, titleY);
+
+        String buttonText = "Restart";
+        glyphLayout.setText(font, buttonText);
+        float textX = btn.x + (btn.width - glyphLayout.width) * 0.5f;
+        float textY = btn.y + (btn.height + glyphLayout.height) * 0.5f;
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, textX, textY);
         spriteBatch.end();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);

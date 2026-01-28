@@ -4,3 +4,5 @@ test_chip;Test Chip;32;textures/items/test_chip.png
 steel_rapier;Steel Rapier;1;textures/items/weapons/steel_rapier.png;true;220
 
 steel_pickaxe;Steel Pickaxe;1;textures/items/tools/steel_pickaxe.png;true;280
+
+pouch;Pouch;1;textures/items/containers/pouch.png
