@@ -74,7 +74,7 @@ public final class WeaponSystem {
             float deltaSeconds,
             Player player,
             ItemStack equippedItem,
-            Viewport worldViewport,
+            Vector2 mouseWorld,
             float gridOriginX,
             float gridOriginY,
             float tileSize,
@@ -96,7 +96,7 @@ public final class WeaponSystem {
             cooldownTimer = 0f;
         }
 
-        updateAim(player, worldViewport, gridOriginX, gridOriginY, tileSize);
+        updateAim(player, mouseWorld, gridOriginX, gridOriginY, tileSize);
         handleAttackInput(spec, inventoryOpen, pointerOnUi);
 
         boolean swinging = swingTimer > 0f;
@@ -156,9 +156,8 @@ public final class WeaponSystem {
         }
     }
 
-    private void updateAim(Player player, Viewport worldViewport, float gridOriginX, float gridOriginY, float tileSize) {
-        tmpMouse.set(Gdx.input.getX(), Gdx.input.getY());
-        worldViewport.unproject(tmpMouse);
+    private void updateAim(Player player, Vector2 mouseWorld, float gridOriginX, float gridOriginY, float tileSize) {
+        tmpMouse.set(mouseWorld);
 
         float centerX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
         float centerY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;
