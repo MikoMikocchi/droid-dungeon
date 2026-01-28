@@ -21,6 +21,7 @@ import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.systems.WeaponSystem.WeaponState;
 
 public final class WorldRenderer {
@@ -31,6 +32,7 @@ public final class WorldRenderer {
     private final TextureRegion whiteRegion;
     private final TextureRegion playerRegion;
     private final TextureRegion doroRegion;
+    private final TextureRegion catsterRegion;
     private final Color tempColor = new Color();
     private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
     private static final Color DANGER_TINT = new Color(0.82f, 0.25f, 0.25f, 1f);
@@ -40,6 +42,7 @@ public final class WorldRenderer {
         whiteRegion = RenderAssets.whiteRegion();
         playerRegion = RenderAssets.playerRegion();
         doroRegion = RenderAssets.doroRegion();
+        catsterRegion = RenderAssets.catsterRegion();
     }
 
     public void render(
@@ -51,6 +54,7 @@ public final class WorldRenderer {
             WeaponState weaponState,
             List<GroundItem> groundItems,
             ItemRegistry itemRegistry,
+            List<Enemy> enemies,
             float companionX,
             float companionY
     ) {
@@ -69,9 +73,24 @@ public final class WorldRenderer {
         spriteBatch.begin();
         spriteBatch.setColor(Color.WHITE);
         renderGroundItems(groundItems, itemRegistry, tileSize, gridOriginX, gridOriginY);
+        renderEnemies(enemies, gridOriginX, gridOriginY, tileSize);
         renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
         spriteBatch.end();
+    }
+
+    private void renderEnemies(List<Enemy> enemies, float gridOriginX, float gridOriginY, float tileSize) {
+        if (enemies == null || enemies.isEmpty()) {
+            return;
+        }
+        float drawSize = tileSize * 0.9f;
+        for (Enemy enemy : enemies) {
+            float centerX = gridOriginX + (enemy.getRenderX() + 0.5f) * tileSize;
+            float centerY = gridOriginY + (enemy.getRenderY() + 0.5f) * tileSize;
+            float drawX = centerX - drawSize * 0.5f;
+            float drawY = centerY - drawSize * 0.5f;
+            spriteBatch.draw(catsterRegion, drawX, drawY, drawSize, drawSize);
+        }
     }
 
     private void renderCompanionDoro(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {

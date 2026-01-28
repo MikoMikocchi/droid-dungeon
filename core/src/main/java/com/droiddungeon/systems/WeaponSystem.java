@@ -42,14 +42,15 @@ public final class WeaponSystem {
             float innerHoleTiles,
             float swingProgress,
             float cooldownRatio,
-            float damage
+            float damage,
+            int swingIndex
     ) {
         public boolean ready() {
             return active && cooldownRatio <= 0f && !swinging;
         }
 
         public static WeaponState inactive() {
-            return new WeaponState(false, false, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
+            return new WeaponState(false, false, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0);
         }
     }
 
@@ -59,6 +60,7 @@ public final class WeaponSystem {
     private float aimAngleRad;
     private float swingTimer;
     private float cooldownTimer;
+    private int swingIndex;
     private WeaponState cachedState = WeaponState.inactive();
 
     public void register(String itemId, WeaponSpec spec) {
@@ -126,7 +128,8 @@ public final class WeaponSystem {
                 inner,
                 swingProgress,
                 cooldownRatio,
-                damage
+                damage,
+                swingIndex
         );
         return cachedState;
     }
@@ -149,6 +152,7 @@ public final class WeaponSystem {
         if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && cooldownTimer <= 0f) {
             swingTimer = spec.swingDuration();
             cooldownTimer = spec.swingDuration() + spec.cooldownDuration();
+            swingIndex++;
         }
     }
 

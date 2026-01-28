@@ -4,11 +4,12 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.systems.EnemySystem;
 
 public final class HeldMovementController {
     private Direction preferredDir = Direction.RIGHT;
 
-    public void update(Grid grid, Player player) {
+    public void update(Grid grid, Player player, EnemySystem enemySystem) {
         if (player.isMoving()) {
             return;
         }
@@ -41,6 +42,11 @@ public final class HeldMovementController {
             return;
         }
 
+        int targetX = player.getGridX() + chosen.dx;
+        int targetY = player.getGridY() + chosen.dy;
+        if (enemySystem != null && enemySystem.isTileOccupied(targetX, targetY)) {
+            return;
+        }
         player.tryMoveBy(chosen.dx, chosen.dy, grid);
     }
 

@@ -25,8 +25,10 @@ import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.CompanionSystem;
+import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.WeaponSystem;
+import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 
@@ -43,6 +45,9 @@ public class DroidDungeonGame extends ApplicationAdapter {
 
     private Grid grid;
     private Player player;
+    private PlayerStats playerStats;
+    private EnemySystem enemySystem;
+    private long worldSeed;
 
     private Inventory inventory;
     private ItemRegistry itemRegistry;
@@ -62,11 +67,13 @@ public class DroidDungeonGame extends ApplicationAdapter {
         uiViewport = new ScreenViewport(uiCamera);
         cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
-        long seed = TimeUtils.millis();
-        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), seed);
+        worldSeed = TimeUtils.millis();
+        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
         grid = layout.grid();
         player = new Player(layout.spawnX(), layout.spawnY());
+        playerStats = new PlayerStats(100f);
         companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
+        enemySystem = new EnemySystem(grid, worldSeed);
 
         worldRenderer = new WorldRenderer();
         hudRenderer = new HudRenderer();
@@ -111,6 +118,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         }
 
         float delta = Gdx.graphics.getDeltaTime();
+        playerStats.update(delta);
 
         int slotUnderCursor = hudRenderer.hitTestSlot(uiViewport, Gdx.input.getX(), Gdx.input.getY(), inventorySystem.isInventoryOpen());
         int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
@@ -120,7 +128,7 @@ public class DroidDungeonGame extends ApplicationAdapter {
         boolean pointerOnUi = slotUnderCursor != -1;
 
         if (!inventorySystem.isInventoryOpen()) {
-            movementController.update(grid, player);
+            movementController.update(grid, player, enemySystem);
         }
         companionSystem.updateFollowerTrail(player.getGridX(), player.getGridY());
         player.update(delta, config.playerSpeedTilesPerSecond());
@@ -142,9 +150,11 @@ public class DroidDungeonGame extends ApplicationAdapter {
                 pointerOnUi
         );
 
-        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, companionSystem.getRenderX(), companionSystem.getRenderY());
+        enemySystem.update(delta, player, playerStats, weaponState);
+
+        worldRenderer.render(worldViewport, gridOriginX, gridOriginY, grid, player, weaponState, inventorySystem.getGroundItems(), itemRegistry, enemySystem.getEnemies(), companionSystem.getRenderX(), companionSystem.getRenderY());
         String debugText = buildDebugText(gridOriginX, gridOriginY);
-        hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta);
+        hudRenderer.render(uiViewport, inventory, itemRegistry, inventorySystem.getCursorStack(), inventorySystem.isInventoryOpen(), inventorySystem.getSelectedSlotIndex(), hoveredSlot, delta, playerStats);
         debugOverlay.render(uiViewport, grid, player, companionSystem.getRenderX(), companionSystem.getRenderY(), debugText);
     }
 
@@ -201,6 +211,15 @@ public class DroidDungeonGame extends ApplicationAdapter {
                 hasEntities = true;
             }
 
+            if (enemySystem != null) {
+                for (com.droiddungeon.enemies.Enemy enemy : enemySystem.getEnemies()) {
+                    if (enemy.getGridX() == tileX && enemy.getGridY() == tileY) {
+                        text.append(hasEntities ? ", " : "\nEntity: ").append("Catster");
+                        hasEntities = true;
+                    }
+                }
+            }
+
             for (GroundItem groundItem : inventorySystem.getGroundItems()) {
                 if (groundItem.isAt(tileX, tileY)) {
                     ItemDefinition def = itemRegistry.get(groundItem.getStack().itemId());
@@ -233,6 +252,21 @@ public class DroidDungeonGame extends ApplicationAdapter {
             }
         } else {
             text.append("\nEquipped: —");
+        }
+
+        text.append("\nHP: ").append(Math.round(playerStats.getHealth())).append("/").append((int) playerStats.getMaxHealth());
+        if (enemySystem != null) {
+            int total = enemySystem.getEnemies().size();
+            int alert = 0;
+            for (com.droiddungeon.enemies.Enemy enemy : enemySystem.getEnemies()) {
+                if (enemy.hasLineOfSight()) {
+                    alert++;
+                }
+            }
+            text.append("\nEnemies: ").append(total);
+            if (alert > 0) {
+                text.append(" (alert: ").append(alert).append(")");
+            }
         }
         return text.toString();
     }

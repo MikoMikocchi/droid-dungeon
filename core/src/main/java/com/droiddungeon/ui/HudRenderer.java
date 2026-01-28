@@ -54,7 +54,8 @@ public final class HudRenderer {
             boolean inventoryOpen,
             int selectedSlotIndex,
             int hoveredSlotIndex,
-            float deltaSeconds
+            float deltaSeconds,
+            com.droiddungeon.player.PlayerStats playerStats
     ) {
         viewport.apply();
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
@@ -65,6 +66,7 @@ public final class HudRenderer {
         updateTooltipData(viewport, inventory, itemRegistry, hoveredSlotIndex);
 
         renderShapes(viewport, inventory, inventoryOpen, selectedSlotIndex);
+        renderHealth(viewport, playerStats);
 
         spriteBatch.begin();
         renderSlotContents(inventory, itemRegistry);
@@ -302,6 +304,45 @@ public final class HudRenderer {
 
         font.setColor(Color.WHITE);
         font.draw(batch, text, Math.round(x), Math.round(y));
+    }
+
+    private void renderHealth(Viewport viewport, com.droiddungeon.player.PlayerStats stats) {
+        if (stats == null) {
+            return;
+        }
+        float barWidth = 210f;
+        float barHeight = 18f;
+        float margin = 12f;
+        float x = margin;
+        float y = viewport.getWorldHeight() - margin - barHeight;
+
+        float ratio = Math.max(0f, Math.min(1f, stats.getHealthRatio()));
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
+        shapeRenderer.rect(x - 3f, y - 3f, barWidth + 6f, barHeight + 6f);
+
+        shapeRenderer.setColor(0.14f, 0.14f, 0.16f, 1f);
+        shapeRenderer.rect(x, y, barWidth, barHeight);
+
+        Color fill = ratio > 0.5f ? new Color(0.25f, 0.85f, 0.35f, 1f) : new Color(0.92f, 0.35f, 0.2f, 1f);
+        shapeRenderer.setColor(fill);
+        shapeRenderer.rect(x, y, barWidth * ratio, barHeight);
+        shapeRenderer.end();
+
+        spriteBatch.begin();
+        String text = "HP: " + Math.round(stats.getHealth()) + "/" + (int) stats.getMaxHealth();
+        glyphLayout.setText(font, text);
+        float textX = x + (barWidth - glyphLayout.width) * 0.5f;
+        float textY = y + (barHeight + glyphLayout.height) * 0.5f;
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, text, textX, textY);
+        spriteBatch.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     public int hitTestSlot(Viewport viewport, float screenX, float screenY, boolean inventoryOpen) {

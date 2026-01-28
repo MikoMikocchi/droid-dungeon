@@ -21,6 +21,8 @@ public final class RenderAssets {
     private static TextureRegion playerRegion;
     private static Texture doroTexture;
     private static TextureRegion doroRegion;
+    private static Texture catsterTexture;
+    private static TextureRegion catsterRegion;
 
     private RenderAssets() {
     }
@@ -68,6 +70,11 @@ public final class RenderAssets {
             doroTexture = null;
             doroRegion = null;
         }
+        if (catsterTexture != null) {
+            catsterTexture.dispose();
+            catsterTexture = null;
+            catsterRegion = null;
+        }
     }
 
     public static TextureRegion playerRegion() {
@@ -86,6 +93,15 @@ public final class RenderAssets {
             doroRegion = new TextureRegion(doroTexture);
         }
         return doroRegion;
+    }
+
+    public static TextureRegion catsterRegion() {
+        if (catsterRegion == null) {
+            catsterTexture = new Texture(Gdx.files.internal("textures/entities/hostile/catster.png"));
+            catsterTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            catsterRegion = new TextureRegion(catsterTexture);
+        }
+        return catsterRegion;
     }
 
     private static BitmapFont loadFont(int size) {
