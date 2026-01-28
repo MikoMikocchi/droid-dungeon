@@ -6,10 +6,10 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.EnemySystem;
@@ -76,10 +76,10 @@ public final class DebugTextBuilder {
             hasEntities = true;
         }
 
-        int doroX = companionSystem.getGridX();
-        int doroY = companionSystem.getGridY();
-        if (doroX == tileX && doroY == tileY) {
-            text.append(hasEntities ? ", " : "\nEntity: ").append("Doro");
+        int dottyX = companionSystem.getGridX();
+        int dottyY = companionSystem.getGridY();
+        if (dottyX == tileX && dottyY == tileY) {
+            text.append(hasEntities ? ", " : "\nEntity: ").append("Dotty");
             hasEntities = true;
         }
 

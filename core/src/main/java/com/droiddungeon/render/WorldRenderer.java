@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
@@ -21,9 +22,8 @@ import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.ui.MapMarker;
-import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.systems.WeaponSystem.WeaponState;
+import com.droiddungeon.ui.MapMarker;
 
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -32,7 +32,7 @@ public final class WorldRenderer {
     private final GlyphLayout glyphLayout = new GlyphLayout();
     private final TextureRegion whiteRegion;
     private final TextureRegion playerRegion;
-    private final TextureRegion doroRegion;
+    private final TextureRegion dottyRegion;
     private final TextureRegion catsterRegion;
     private final Color tempColor = new Color();
     private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
@@ -42,7 +42,7 @@ public final class WorldRenderer {
         font = RenderAssets.font(13);
         whiteRegion = RenderAssets.whiteRegion();
         playerRegion = RenderAssets.playerRegion();
-        doroRegion = RenderAssets.doroRegion();
+        dottyRegion = RenderAssets.dottyRegion();
         catsterRegion = RenderAssets.catsterRegion();
     }
 
@@ -76,7 +76,7 @@ public final class WorldRenderer {
         spriteBatch.setColor(Color.WHITE);
         renderGroundItems(groundItems, itemRegistry, tileSize, gridOriginX, gridOriginY);
         renderEnemies(enemies, gridOriginX, gridOriginY, tileSize);
-        renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
+        renderCompanionDotty(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
         spriteBatch.end();
 
@@ -137,14 +137,14 @@ public final class WorldRenderer {
         }
     }
 
-    private void renderCompanionDoro(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {
+    private void renderCompanionDotty(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {
         float centerX = gridOriginX + (companionX + 0.5f) * tileSize;
         float centerY = gridOriginY + (companionY + 0.5f) * tileSize;
         float drawSize = tileSize * 0.9f;
         float drawX = centerX - drawSize * 0.5f;
         float drawY = centerY - drawSize * 0.5f;
 
-        spriteBatch.draw(doroRegion, drawX, drawY, drawSize, drawSize);
+        spriteBatch.draw(dottyRegion, drawX, drawY, drawSize, drawSize);
     }
 
     private void renderWeaponFan(WeaponState weaponState, Player player, float gridOriginX, float gridOriginY, float tileSize) {

@@ -19,8 +19,8 @@ public final class RenderAssets {
     private static TextureRegion whiteRegion;
     private static Texture playerTexture;
     private static TextureRegion playerRegion;
-    private static Texture doroTexture;
-    private static TextureRegion doroRegion;
+    private static Texture dottyTexture;
+    private static TextureRegion dottyRegion;
     private static Texture catsterTexture;
     private static TextureRegion catsterRegion;
 
@@ -65,10 +65,10 @@ public final class RenderAssets {
             playerTexture = null;
             playerRegion = null;
         }
-        if (doroTexture != null) {
-            doroTexture.dispose();
-            doroTexture = null;
-            doroRegion = null;
+        if (dottyTexture != null) {
+            dottyTexture.dispose();
+            dottyTexture = null;
+            dottyRegion = null;
         }
         if (catsterTexture != null) {
             catsterTexture.dispose();
@@ -86,13 +86,13 @@ public final class RenderAssets {
         return playerRegion;
     }
 
-    public static TextureRegion doroRegion() {
-        if (doroRegion == null) {
-            doroTexture = new Texture(Gdx.files.internal("textures/entities/humanoids/Doro.png"));
-            doroTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-            doroRegion = new TextureRegion(doroTexture);
+    public static TextureRegion dottyRegion() {
+        if (dottyRegion == null) {
+            dottyTexture = new Texture(Gdx.files.internal("textures/entities/humanoids/Dotty.png"));
+            dottyTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            dottyRegion = new TextureRegion(dottyTexture);
         }
-        return doroRegion;
+        return dottyRegion;
     }
 
     public static TextureRegion catsterRegion() {
