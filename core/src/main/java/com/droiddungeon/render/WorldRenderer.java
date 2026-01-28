@@ -21,6 +21,7 @@ import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.ui.MapMarker;
 import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.systems.WeaponSystem.WeaponState;
 
@@ -55,6 +56,7 @@ public final class WorldRenderer {
             List<GroundItem> groundItems,
             ItemRegistry itemRegistry,
             List<Enemy> enemies,
+            MapMarker trackedMarker,
             float companionX,
             float companionY
     ) {
@@ -77,6 +79,48 @@ public final class WorldRenderer {
         renderCompanionDoro(gridOriginX, gridOriginY, tileSize, companionX, companionY);
         renderPlayer(player, gridOriginX, gridOriginY, tileSize);
         spriteBatch.end();
+
+        renderTrackedPointer(viewport, grid, player, trackedMarker);
+    }
+
+    private void renderTrackedPointer(Viewport viewport, Grid grid, Player player, MapMarker tracked) {
+        if (tracked == null) {
+            return;
+        }
+        com.badlogic.gdx.graphics.OrthographicCamera cam = (com.badlogic.gdx.graphics.OrthographicCamera) viewport.getCamera();
+        float halfW = cam.viewportWidth * cam.zoom * 0.5f;
+        float halfH = cam.viewportHeight * cam.zoom * 0.5f;
+        float tileSize = grid.getTileSize();
+
+        float targetX = (tracked.x() + 0.5f) * tileSize;
+        float targetY = (tracked.y() + 0.5f) * tileSize;
+        float dx = targetX - cam.position.x;
+        float dy = targetY - cam.position.y;
+
+        if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) {
+            return; // on screen
+        }
+
+        float margin = 18f;
+        float maxX = halfW - margin;
+        float maxY = halfH - margin;
+        float scale = Math.max(Math.abs(dx) / maxX, Math.abs(dy) / maxY);
+        float px = cam.position.x + dx / scale;
+        float py = cam.position.y + dy / scale;
+
+        float angle = MathUtils.atan2(dy, dx);
+        float size = 14f;
+        float x1 = px + MathUtils.cos(angle) * size;
+        float y1 = py + MathUtils.sin(angle) * size;
+        float x2 = px + MathUtils.cos(angle + MathUtils.PI * 0.66f) * size * 0.7f;
+        float y2 = py + MathUtils.sin(angle + MathUtils.PI * 0.66f) * size * 0.7f;
+        float x3 = px + MathUtils.cos(angle - MathUtils.PI * 0.66f) * size * 0.7f;
+        float y3 = py + MathUtils.sin(angle - MathUtils.PI * 0.66f) * size * 0.7f;
+
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(0.95f, 0.8f, 0.3f, 0.9f);
+        shapeRenderer.triangle(x1, y1, x2, y2, x3, y3);
+        shapeRenderer.end();
     }
 
     private void renderEnemies(List<Enemy> enemies, float gridOriginX, float gridOriginY, float tileSize) {

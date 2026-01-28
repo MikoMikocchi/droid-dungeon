@@ -2,16 +2,18 @@ package com.droiddungeon.ui;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.render.RenderAssets;
-import com.badlogic.gdx.utils.viewport.Viewport;
 
 /**
  * Renders debug text and minimap overlay.
@@ -21,22 +23,23 @@ public final class DebugOverlay {
     private final SpriteBatch spriteBatch = new SpriteBatch();
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
+    private final Rectangle lastMinimapBounds = new Rectangle();
 
     public DebugOverlay() {
         font = RenderAssets.font(14);
         RenderAssets.whiteRegion();
     }
 
-    public void render(Viewport viewport, Grid grid, Player player, float companionX, float companionY, String debugText) {
+    public void render(Viewport viewport, Grid grid, Player player, float companionX, float companionY, String debugText, java.util.List<MapMarker> markers, MapMarker tracked) {
         viewport.apply();
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
         spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        renderMinimap(viewport, grid, player, companionX, companionY);
+        renderMinimap(viewport, grid, player, companionX, companionY, markers, tracked);
         renderDebugBox(viewport, debugText);
     }
 
-    private void renderMinimap(Viewport viewport, Grid grid, Player player, float companionX, float companionY) {
+    private void renderMinimap(Viewport viewport, Grid grid, Player player, float companionX, float companionY, java.util.List<MapMarker> markers, MapMarker tracked) {
         if (grid == null || player == null) {
             return;
         }
@@ -48,16 +51,17 @@ public final class DebugOverlay {
         int windowSize = radius * 2 + 1;
 
         float margin = 12f;
-        float maxWidth = 240f;
-        float maxHeight = 170f;
+        float maxWidth = 300f;
+        float maxHeight = 220f;
         float tile = Math.min(maxWidth / windowSize, maxHeight / windowSize);
         tile = Math.max(2f, tile);
 
+        float pad = 6f;
         float mapWidth = tile * windowSize;
         float mapHeight = tile * windowSize;
         float originX = viewportWidth - margin - mapWidth;
         float originY = viewportHeight - margin - mapHeight;
-        float pad = 6f;
+        lastMinimapBounds.set(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
 
         int minX = player.getGridX() - radius;
         int minY = player.getGridY() - radius;
@@ -68,7 +72,19 @@ public final class DebugOverlay {
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
         shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
+        shapeRenderer.end();
 
+        // Scissor mask to keep corners inside frame
+        GL20 gl = Gdx.graphics.getGL20();
+        gl.glEnable(GL20.GL_SCISSOR_TEST);
+        int sx = Math.round((originX - pad) * Gdx.graphics.getBackBufferWidth() / viewportWidth);
+        int sy = Math.round((originY - pad) * Gdx.graphics.getBackBufferHeight() / viewportHeight);
+        int sw = Math.round((mapWidth + pad * 2f) * Gdx.graphics.getBackBufferWidth() / viewportWidth);
+        int sh = Math.round((mapHeight + pad * 2f) * Gdx.graphics.getBackBufferHeight() / viewportHeight);
+        gl.glScissor(sx, sy, sw, sh);
+
+        shapeRenderer.begin(ShapeType.Filled);
+        // Base tile fill inside scissor
         for (int y = 0; y < windowSize; y++) {
             for (int x = 0; x < windowSize; x++) {
                 int worldX = minX + x;
@@ -76,11 +92,36 @@ public final class DebugOverlay {
                 float drawX = originX + x * tile;
                 float drawY = originY + y * tile;
                 Color base = grid.getTileMaterial(worldX, worldY).darkColor();
-                com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(worldX, worldY);
-                Color tint = colorForRoom(base, roomType);
-                shapeRenderer.setColor(tint);
+                shapeRenderer.setColor(base);
                 shapeRenderer.rect(drawX, drawY, tile, tile);
             }
+        }
+        shapeRenderer.end();
+
+        // Room corners and markers on minimap
+        shapeRenderer.begin(ShapeType.Filled);
+        java.util.List<com.droiddungeon.grid.DungeonGenerator.Room> rooms = grid.getRoomsInArea(minX, minY, minX + windowSize, minY + windowSize);
+        float cornerThickness = Math.max(1.2f, tile * 0.18f);
+        float segment = tile * 1.1f;
+        for (com.droiddungeon.grid.DungeonGenerator.Room room : rooms) {
+            Color tint = room.type == RoomType.SAFE ? new Color(0.30f, 0.55f, 0.95f, 1f) : new Color(0.82f, 0.25f, 0.25f, 1f);
+            shapeRenderer.setColor(tint);
+            float rx0 = originX + (room.x - minX) * tile - cornerThickness;
+            float ry0 = originY + (room.y - minY) * tile - cornerThickness;
+            float rx1 = rx0 + room.width * tile + cornerThickness * 2f;
+            float ry1 = ry0 + room.height * tile + cornerThickness * 2f;
+            // TL
+            shapeRenderer.rect(rx0, ry1 - cornerThickness, segment, cornerThickness);
+            shapeRenderer.rect(rx0, ry1 - segment, cornerThickness, segment);
+            // TR
+            shapeRenderer.rect(rx1 - segment, ry1 - cornerThickness, segment, cornerThickness);
+            shapeRenderer.rect(rx1 - cornerThickness, ry1 - segment, cornerThickness, segment);
+            // BL
+            shapeRenderer.rect(rx0, ry0, segment, cornerThickness);
+            shapeRenderer.rect(rx0, ry0, cornerThickness, segment);
+            // BR
+            shapeRenderer.rect(rx1 - segment, ry0, segment, cornerThickness);
+            shapeRenderer.rect(rx1 - cornerThickness, ry0, cornerThickness, segment);
         }
 
         float playerX = originX + (radius + 0.5f) * tile;
@@ -100,6 +141,26 @@ public final class DebugOverlay {
             shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
             shapeRenderer.rect(companionWorldX - halfCompanion, companionWorldY - halfCompanion, companionSize, companionSize);
         }
+        // Markers
+        if (markers != null) {
+            for (MapMarker marker : markers) {
+                float dx = marker.x() - player.getRenderX();
+                float dy = marker.y() - player.getRenderY();
+                if (Math.abs(dx) > radius || Math.abs(dy) > radius) {
+                    continue;
+                }
+                float mx = originX + (radius + dx + 0.5f) * tile;
+                float my = originY + (radius + dy + 0.5f) * tile;
+                Color c = marker.type() == MapMarker.Type.DEATH ? new Color(0.9f, 0.25f, 0.25f, 1f) : new Color(0.32f, 0.7f, 0.95f, 1f);
+                shapeRenderer.setColor(c);
+                shapeRenderer.rect(mx - 2f, my - 2f, 4f, 4f);
+                if (marker.tracked()) {
+                    shapeRenderer.setColor(Color.WHITE);
+                    shapeRenderer.rect(mx - 3f, my - 0.8f, 6f, 1.6f);
+                    shapeRenderer.rect(mx - 0.8f, my - 3f, 1.6f, 6f);
+                }
+            }
+        }
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeType.Line);
@@ -107,7 +168,12 @@ public final class DebugOverlay {
         shapeRenderer.rect(originX - pad, originY - pad, mapWidth + pad * 2f, mapHeight + pad * 2f);
         shapeRenderer.end();
 
+        Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
         Gdx.gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
+    }
+
+    public Rectangle getLastMinimapBounds() {
+        return lastMinimapBounds;
     }
 
     private void renderDebugBox(Viewport viewport, String text) {
@@ -149,15 +215,5 @@ public final class DebugOverlay {
     public void dispose() {
         shapeRenderer.dispose();
         spriteBatch.dispose();
-    }
-
-    private Color colorForRoom(Color base, RoomType roomType) {
-        if (roomType == RoomType.SAFE) {
-            return new Color(0.32f, 0.55f, 0.95f, 0.95f);
-        }
-        if (roomType == RoomType.DANGER) {
-            return new Color(0.82f, 0.26f, 0.26f, 0.95f);
-        }
-        return new Color(base.r * 0.75f + 0.18f, base.g * 0.75f + 0.18f, base.b * 0.75f + 0.18f, 0.95f);
     }
 }
