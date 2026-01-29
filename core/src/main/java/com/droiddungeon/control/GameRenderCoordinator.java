@@ -6,6 +6,8 @@ import com.droiddungeon.input.InputFrame;
 import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.render.WorldRenderer;
+import com.droiddungeon.render.effects.ScreenEffectRenderer;
+import com.droiddungeon.render.effects.VignetteEffect;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 import com.droiddungeon.ui.MinimapRenderer;
@@ -15,10 +17,20 @@ import com.droiddungeon.ui.MapOverlay;
  * Coordinates rendering of world, HUD, debug, and map overlay.
  */
 public final class GameRenderCoordinator {
-    private final WorldRenderer worldRenderer = new WorldRenderer();
-    private final HudRenderer hudRenderer = new HudRenderer();
-    private final MinimapRenderer minimapRenderer = new MinimapRenderer();
-    private final DebugOverlay debugOverlay = new DebugOverlay();
+    private final WorldRenderer worldRenderer;
+    private final HudRenderer hudRenderer;
+    private final MinimapRenderer minimapRenderer;
+    private final DebugOverlay debugOverlay;
+    private final ScreenEffectRenderer screenEffectRenderer;
+
+    public GameRenderCoordinator() {
+        worldRenderer = new WorldRenderer();
+        hudRenderer = new HudRenderer();
+        minimapRenderer = new MinimapRenderer();
+        debugOverlay = new DebugOverlay();
+        screenEffectRenderer = new ScreenEffectRenderer();
+        screenEffectRenderer.addEffect(new VignetteEffect());
+    }
 
     public boolean render(
             Viewport worldViewport,
@@ -46,6 +58,9 @@ public final class GameRenderCoordinator {
                 ctx.companionSystem().getRenderX(),
                 ctx.companionSystem().getRenderY()
         );
+
+        // Post-process style screen effects should sit between world and UI so the HUD stays crisp.
+        screenEffectRenderer.render(uiViewport, delta);
 
         String debugText = debugTextBuilder.build(
                 worldViewport,
@@ -106,11 +121,16 @@ public final class GameRenderCoordinator {
         return restartHovered;
     }
 
+    public void resize(int width, int height) {
+        screenEffectRenderer.resize(width, height);
+    }
+
     public void dispose() {
         worldRenderer.dispose();
         hudRenderer.dispose();
         minimapRenderer.dispose();
         debugOverlay.dispose();
+        screenEffectRenderer.dispose();
     }
 
     public HudRenderer hudRenderer() {

@@ -108,6 +108,7 @@ public final class GameRuntime {
     public void resize(int width, int height) {
         uiViewport.update(width, height, true);
         cameraController.resize(width, height);
+        renderer.resize(width, height);
     }
 
     public void render() {
