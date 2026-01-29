@@ -8,8 +8,11 @@ import java.util.Set;
 
 import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.enemies.EnemyType;
+import com.droiddungeon.entity.DamageableEntity;
 import com.droiddungeon.entity.EntityIds;
+import com.droiddungeon.entity.EntityLayer;
 import com.droiddungeon.entity.EntityWorld;
+import com.droiddungeon.entity.RenderableEntity;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -65,14 +68,13 @@ public final class EnemySystem {
             } else {
                 wander(enemy, occupied);
             }
-            if (weaponState != null) {
-                tryApplyWeaponHit(enemy, player, weaponState);
-            }
         }
 
         for (Enemy enemy : enemies) {
             enemy.updateRender(deltaSeconds);
         }
+
+        applyWeaponHits(player, weaponState);
 
         enemies.removeIf(enemy -> {
             if (enemy.isDead()) {
@@ -226,8 +228,8 @@ public final class EnemySystem {
         return true;
     }
 
-    private void tryApplyWeaponHit(Enemy enemy, Player player, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
-        if (!weaponState.swinging()) {
+    private void applyWeaponHits(Player player, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
+        if (entityWorld == null || weaponState == null || !weaponState.swinging()) {
             return;
         }
         float reach = weaponState.reachTiles();
@@ -236,24 +238,43 @@ public final class EnemySystem {
         }
         float px = player.getRenderX() + 0.5f;
         float py = player.getRenderY() + 0.5f;
-        float ex = enemy.getRenderX() + 0.5f;
-        float ey = enemy.getRenderY() + 0.5f;
-        float dx = ex - px;
-        float dy = ey - py;
-        float dist2 = dx * dx + dy * dy;
         float inner = weaponState.innerHoleTiles();
         float outer2 = reach * reach;
         float inner2 = inner * inner;
-        if (dist2 > outer2 || dist2 < inner2) {
-            return;
-        }
 
-        float angleToEnemy = (float) Math.atan2(dy, dx);
-        float delta = angleDelta(weaponState.aimAngleRad(), angleToEnemy);
-        if (Math.abs(delta) > weaponState.arcRad() * 0.5f) {
-            return;
+        for (var entity : entityWorld.all()) {
+            if (entity.layer() != EntityLayer.ACTOR) {
+                continue;
+            }
+            if (entity instanceof Player) {
+                continue; // don't hit the player with own weapon
+            }
+            if (!(entity instanceof RenderableEntity renderable) || !(entity instanceof DamageableEntity damageable)) {
+                continue;
+            }
+            if (damageable.isDead()) {
+                continue;
+            }
+
+            float ex = renderable.renderX() + 0.5f;
+            float ey = renderable.renderY() + 0.5f;
+            float dx = ex - px;
+            float dy = ey - py;
+            float dist2 = dx * dx + dy * dy;
+            if (dist2 > outer2 || dist2 < inner2) {
+                continue;
+            }
+            float angleToEntity = (float) Math.atan2(dy, dx);
+            float delta = angleDelta(weaponState.aimAngleRad(), angleToEntity);
+            if (Math.abs(delta) > weaponState.arcRad() * 0.5f) {
+                continue;
+            }
+            if (entity instanceof Enemy enemy) {
+                enemy.applyDamage(weaponState.damage(), weaponState.swingIndex());
+            } else {
+                damageable.applyDamage(weaponState.damage());
+            }
         }
-        enemy.applyDamage(weaponState.damage(), weaponState.swingIndex());
     }
 
     private float angleDelta(float a, float b) {

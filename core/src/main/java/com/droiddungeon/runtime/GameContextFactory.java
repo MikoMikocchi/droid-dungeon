@@ -55,6 +55,7 @@ public final class GameContextFactory {
 
     public GameContext createContext() {
         entityWorld.clear();
+        inventorySystem.clearGroundItems();
         enemySystem.reset();
 
         Player player = new Player(EntityIds.next(), spawnX, spawnY);

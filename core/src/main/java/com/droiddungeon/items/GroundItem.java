@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.droiddungeon.entity.EntityLayer;
+import com.droiddungeon.entity.GridEntity;
 import com.droiddungeon.inventory.ItemStack;
 
-public final class GroundItem {
-    private int gridX;
-    private int gridY;
+public final class GroundItem implements GridEntity {
+    private final int id;
+    private final int gridX;
+    private final int gridY;
     private ItemStack stack;
     private final List<ItemStack> bundled;
 
@@ -43,17 +46,43 @@ public final class GroundItem {
         return bundled;
     }
 
-    public GroundItem(int gridX, int gridY, ItemStack stack) {
-        this(gridX, gridY, stack, List.of());
+    public GroundItem(int id, int gridX, int gridY, ItemStack stack) {
+        this(id, gridX, gridY, stack, List.of());
     }
 
-    public GroundItem(int gridX, int gridY, ItemStack stack, List<ItemStack> bundled) {
+    public GroundItem(int id, int gridX, int gridY, ItemStack stack, List<ItemStack> bundled) {
         if (stack == null) {
             throw new IllegalArgumentException("stack must not be null");
         }
+        this.id = id;
         this.gridX = gridX;
         this.gridY = gridY;
         this.stack = stack;
         this.bundled = bundled == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(bundled));
+    }
+
+    @Override
+    public int id() {
+        return id;
+    }
+
+    @Override
+    public EntityLayer layer() {
+        return EntityLayer.ITEM;
+    }
+
+    @Override
+    public int gridX() {
+        return gridX;
+    }
+
+    @Override
+    public int gridY() {
+        return gridY;
+    }
+
+    @Override
+    public boolean blocking() {
+        return false;
     }
 }

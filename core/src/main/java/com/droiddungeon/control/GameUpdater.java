@@ -23,7 +23,15 @@ public final class GameUpdater {
         this.movementController = movementController;
     }
 
-    public GameUpdateResult update(float delta, boolean dead, InputFrame input, GameContext ctx, float worldViewportTileSize, Vector2 mouseWorld) {
+    public GameUpdateResult update(
+            float delta,
+            boolean dead,
+            InputFrame input,
+            GameContext ctx,
+            float worldViewportTileSize,
+            Vector2 mouseWorld,
+            boolean mapOpen
+    ) {
         float gridOriginX;
         float gridOriginY;
         WeaponSystem.WeaponState weaponState;
@@ -39,7 +47,7 @@ public final class GameUpdater {
                 ctx.inventorySystem().onSlotClicked(input.slotUnderCursor());
             }
 
-            if (!ctx.inventorySystem().isInventoryOpen()) {
+            if (!ctx.inventorySystem().isInventoryOpen() && !mapOpen) {
                 movementController.update(ctx.grid(), ctx.player(), ctx.entityWorld());
             }
             ctx.companionSystem().updateFollowerTrail(ctx.player().getGridX(), ctx.player().getGridY());

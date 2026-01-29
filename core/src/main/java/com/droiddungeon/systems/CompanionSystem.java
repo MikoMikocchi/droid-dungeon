@@ -3,13 +3,14 @@ package com.droiddungeon.systems;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import com.droiddungeon.entity.DamageableEntity;
 import com.droiddungeon.entity.EntityLayer;
 import com.droiddungeon.entity.RenderableEntity;
 
 /**
  * Handles follower movement logic: grid trail + smooth render interpolation.
  */
-public final class CompanionSystem implements RenderableEntity {
+public final class CompanionSystem implements RenderableEntity, DamageableEntity {
     private final int id;
     private final int delayTiles;
     private final float speedTilesPerSecond;
@@ -129,5 +130,21 @@ public final class CompanionSystem implements RenderableEntity {
     @Override
     public boolean isMoving() {
         return Math.abs(renderX - gridX) > 0.001f || Math.abs(renderY - gridY) > 0.001f;
+    }
+
+    // Companion is currently invulnerable.
+    @Override
+    public boolean applyDamage(float amount) {
+        return false;
+    }
+
+    @Override
+    public boolean isDead() {
+        return false;
+    }
+
+    @Override
+    public float healthRatio() {
+        return 1f;
     }
 }

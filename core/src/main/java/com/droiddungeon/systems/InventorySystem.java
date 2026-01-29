@@ -6,6 +6,8 @@ import java.util.List;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.droiddungeon.entity.EntityIds;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
@@ -19,6 +21,7 @@ import com.droiddungeon.items.ItemRegistry;
 public final class InventorySystem {
     private final Inventory inventory;
     private final ItemRegistry itemRegistry;
+    private final EntityWorld entityWorld;
     private final Grid grid;
     private final List<GroundItem> groundItems = new ArrayList<>();
 
@@ -27,10 +30,11 @@ public final class InventorySystem {
     private int selectedSlotIndex;
     private int equippedSlotIndex;
 
-    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid) {
+    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid, EntityWorld entityWorld) {
         this.inventory = inventory;
         this.itemRegistry = itemRegistry;
         this.grid = grid;
+        this.entityWorld = entityWorld;
         this.cursorStack = null;
         this.inventoryOpen = false;
         this.selectedSlotIndex = 0;
@@ -102,10 +106,17 @@ public final class InventorySystem {
                 }
 
                 iterator.remove();
+                if (entityWorld != null) {
+                    entityWorld.remove(groundItem);
+                }
                 if (!leftovers.isEmpty() || pouchRemain != null) {
                     ItemStack pouchStack = pouchRemain != null ? pouchRemain : groundItem.getStack();
                     List<ItemStack> remainingContents = leftovers.isEmpty() ? List.of() : leftovers;
-                    groundItems.add(new GroundItem(playerX, playerY, pouchStack, remainingContents));
+                    GroundItem newBundle = new GroundItem(EntityIds.next(), playerX, playerY, pouchStack, remainingContents);
+                    groundItems.add(newBundle);
+                    if (entityWorld != null) {
+                        entityWorld.add(newBundle);
+                    }
                 }
             } else {
                 ItemStack stack = groundItem.getStack();
@@ -115,6 +126,9 @@ public final class InventorySystem {
                 }
                 if (remaining == null) {
                     iterator.remove();
+                    if (entityWorld != null) {
+                        entityWorld.remove(groundItem);
+                    }
                 } else if (remaining.count() != stack.count()) {
                     groundItem.setStack(remaining);
                 }
@@ -198,7 +212,11 @@ public final class InventorySystem {
 
         while (remaining != null) {
             int chunk = Math.min(remaining.count(), maxStack);
-            groundItems.add(new GroundItem(gridX, gridY, new ItemStack(remaining.itemId(), chunk, remaining.durability())));
+            GroundItem newItem = new GroundItem(EntityIds.next(), gridX, gridY, new ItemStack(remaining.itemId(), chunk, remaining.durability()));
+            groundItems.add(newItem);
+            if (entityWorld != null) {
+                entityWorld.add(newItem);
+            }
             if (remaining.count() <= maxStack) {
                 remaining = null;
             } else {
@@ -211,7 +229,11 @@ public final class InventorySystem {
         if (pouchStack == null || bundled == null || bundled.isEmpty()) {
             return;
         }
-        groundItems.add(new GroundItem(gridX, gridY, pouchStack, bundled));
+        GroundItem item = new GroundItem(EntityIds.next(), gridX, gridY, pouchStack, bundled);
+        groundItems.add(item);
+        if (entityWorld != null) {
+            entityWorld.add(item);
+        }
     }
 
     public List<ItemStack> drainAllItems() {
@@ -227,6 +249,12 @@ public final class InventorySystem {
             result.add(cursorStack);
             cursorStack = null;
         }
+        if (entityWorld != null) {
+            for (GroundItem groundItem : groundItems) {
+                entityWorld.remove(groundItem);
+            }
+        }
+        groundItems.clear();
         selectedSlotIndex = 0;
         updateEquippedFromSelection();
         inventoryOpen = false;
@@ -262,6 +290,15 @@ public final class InventorySystem {
 
     public List<GroundItem> getGroundItems() {
         return groundItems;
+    }
+
+    public void clearGroundItems() {
+        if (entityWorld != null) {
+            for (GroundItem groundItem : groundItems) {
+                entityWorld.remove(groundItem);
+            }
+        }
+        groundItems.clear();
     }
 
     private void updateEquippedFromSelection() {

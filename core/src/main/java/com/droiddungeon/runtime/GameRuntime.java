@@ -90,10 +90,10 @@ public final class GameRuntime {
         mapController = new MapController();
         updater = new GameUpdater(config, cameraController, movementController);
 
+        entityWorld = new EntityWorld();
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
-        inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
-        entityWorld = new EntityWorld();
+        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
         enemySystem = new EnemySystem(grid, worldSeed, entityWorld);
         contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
         context = contextFactory.createContext();
@@ -129,7 +129,8 @@ public final class GameRuntime {
                 input,
                 context,
                 context.grid().getTileSize(),
-                mouseWorld
+                mouseWorld,
+                mapOpen
         );
         weaponState = updateResult.weaponState();
 

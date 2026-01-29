@@ -1,5 +1,6 @@
 package com.droiddungeon.enemies;
 
+import com.droiddungeon.entity.DamageableEntity;
 import com.droiddungeon.entity.EntityLayer;
 import com.droiddungeon.entity.RenderableEntity;
 import com.droiddungeon.grid.Grid;
@@ -7,7 +8,7 @@ import com.droiddungeon.grid.Grid;
 /**
  * Runtime enemy instance (position, timers, room bounds).
  */
-public final class Enemy implements RenderableEntity {
+public final class Enemy implements RenderableEntity, DamageableEntity {
     private final int id;
     private final EnemyType type;
     private final int roomMinX;
@@ -122,6 +123,7 @@ public final class Enemy implements RenderableEntity {
         return Math.abs(renderX - gridX) > 0.001f || Math.abs(renderY - gridY) > 0.001f;
     }
 
+    @Override
     public boolean isDead() {
         return health <= 0f;
     }
@@ -191,15 +193,21 @@ public final class Enemy implements RenderableEntity {
         renderY = gridY;
     }
 
-    public void applyDamage(float amount, int swingIndex) {
+    public boolean applyDamage(float amount, int swingIndex) {
         if (amount <= 0f) {
-            return;
+            return false;
         }
         if (lastHitSwing == swingIndex) {
-            return;
+            return false;
         }
         lastHitSwing = swingIndex;
         health = Math.max(0f, health - amount);
+        return true;
+    }
+
+    @Override
+    public boolean applyDamage(float amount) {
+        return applyDamage(amount, -1);
     }
 
     public int getLastHitSwing() {
@@ -208,5 +216,10 @@ public final class Enemy implements RenderableEntity {
 
     public float getHealth() {
         return health;
+    }
+
+    @Override
+    public float healthRatio() {
+        return type.maxHealth() > 0f ? health / type.maxHealth() : 0f;
     }
 }

@@ -1,9 +1,11 @@
 package com.droiddungeon.player;
 
+import com.droiddungeon.entity.DamageableEntity;
+
 /**
  * Lightweight player combat state (health + brief invulnerability).
  */
-public final class PlayerStats {
+public final class PlayerStats implements DamageableEntity {
     private final float maxHealth;
     private float health;
     private float hurtInvulnerability;
@@ -20,6 +22,7 @@ public final class PlayerStats {
         }
     }
 
+    @Override
     public boolean applyDamage(float amount) {
         if (amount <= 0f) {
             return false;
@@ -44,8 +47,14 @@ public final class PlayerStats {
         return health / maxHealth;
     }
 
+    @Override
     public boolean isDead() {
         return health <= 0f;
+    }
+
+    @Override
+    public float healthRatio() {
+        return getHealthRatio();
     }
 
     public boolean isRecentlyHit() {
