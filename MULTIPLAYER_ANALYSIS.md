@@ -182,7 +182,7 @@ core/src/main/java/com/droiddungeon/
         players += (id -> ref)
         ref ! WorldState(gameState)
       
-      case PlayerMove(id, x, y, ts) =>
+      case PlayerMove(id, x, y, timestamp) =>
         gameState = gameState.updatePlayer(id, x, y)
         broadcast(WorldState(gameState))
       
@@ -271,7 +271,7 @@ dependencies {
     implementation("org.apache.pekko:pekko-http_2.13:$pekkoVersion")
     
     // JSON
-    implementation("com.lihaoyi::upickle:3.1.3")
+    implementation("com.lihaoyi:upickle_2.13:3.1.3")
     
     // Logging
     implementation("ch.qos.logback:logback-classic:1.4.14")

@@ -52,14 +52,12 @@ application {
 }
 
 tasks.withType<ScalaCompile>().configureEach {
-    scalaCompileOptions.apply {
-        additionalParameters = listOf(
-            "-deprecation",
-            "-feature",
-            "-unchecked",
-            "-Xlint"
-        )
-    }
+    scalaCompileOptions.additionalParameters = listOf(
+        "-deprecation",
+        "-feature",
+        "-unchecked",
+        "-Xlint"
+    )
 }
 ```
 
@@ -640,8 +638,9 @@ import java.io.PrintWriter;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * WebSocket клиент для подключения к игровому серверу.
- * Использует LibGDX Net API для кросс-платформенности.
+ * TCP Socket client for connecting to game server.
+ * Uses LibGDX Net API for cross-platform TCP connections.
+ * Note: This is a simplified example. For WebSocket, consider using a dedicated library.
  */
 public class NetworkClient {
     private Socket socket;
@@ -680,6 +679,7 @@ public class NetworkClient {
             Gdx.app.log("NetworkClient", "Connected to " + host + ":" + port);
             
         } catch (Exception e) {
+            connected = false;
             Gdx.app.error("NetworkClient", "Failed to connect", e);
         }
     }
@@ -737,7 +737,8 @@ public class NetworkClient {
     
     private void handleMessage(String jsonMessage) {
         try {
-            // Simple type detection based on fields
+            // TODO: Use proper type discriminator field for reliable message type detection
+            // Current implementation uses field presence detection as a simplified example
             if (jsonMessage.contains("\"players\"")) {
                 WorldState state = json.fromJson(WorldState.class, jsonMessage);
                 if (handler != null) handler.onWorldState(state);
