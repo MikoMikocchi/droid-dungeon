@@ -27,8 +27,9 @@ public final class MinimapRenderer {
     private final Color enemyColor = new Color(0.86f, 0.32f, 0.32f, 1f);
     private final Color deathColor = new Color(0.9f, 0.25f, 0.25f, 1f);
     private final Color markerColor = new Color(0.32f, 0.7f, 0.95f, 1f);
+    private final Color fogColor = new Color(0f, 0f, 0f, 0.9f);
 
-    public void render(Viewport viewport, Grid grid, Player player, float companionX, float companionY, List<Enemy> enemies, List<MapMarker> markers, MapMarker tracked) {
+    public void render(Viewport viewport, Grid grid, Player player, float companionX, float companionY, List<Enemy> enemies, List<MapMarker> markers, MapMarker tracked, java.util.function.BiPredicate<Integer, Integer> explored) {
         if (grid == null || player == null) {
             return;
         }
@@ -82,9 +83,14 @@ public final class MinimapRenderer {
                 int worldY = minY + y;
                 float drawX = originX + x * tile;
                 float drawY = originY + y * tile;
-                Color base = grid.getTileMaterial(worldX, worldY).darkColor();
-                shapeRenderer.setColor(base);
-                shapeRenderer.rect(drawX, drawY, tile, tile);
+                if (explored != null && !explored.test(worldX, worldY)) {
+                    shapeRenderer.setColor(fogColor);
+                    shapeRenderer.rect(drawX, drawY, tile, tile);
+                } else {
+                    Color base = grid.getTileMaterial(worldX, worldY).darkColor();
+                    shapeRenderer.setColor(base);
+                    shapeRenderer.rect(drawX, drawY, tile, tile);
+                }
             }
         }
         shapeRenderer.end();
@@ -95,6 +101,9 @@ public final class MinimapRenderer {
         float cornerThickness = Math.max(1.2f, tile * 0.18f);
         float segment = tile * 1.1f;
         for (Room room : rooms) {
+            if (explored != null && !roomExplored(room, explored)) {
+                continue;
+            }
             Color tint = room.type == RoomType.SAFE ? new Color(0.30f, 0.55f, 0.95f, 1f) : new Color(0.82f, 0.25f, 0.25f, 1f);
             shapeRenderer.setColor(tint);
             float rx0 = originX + (room.x - minX) * tile - cornerThickness;
@@ -140,6 +149,9 @@ public final class MinimapRenderer {
                 if (Math.abs(dx) > radius || Math.abs(dy) > radius) {
                     continue;
                 }
+                if (explored != null && !explored.test((int) marker.x(), (int) marker.y())) {
+                    continue;
+                }
                 float mx = originX + (radius + dx + 0.5f) * tile;
                 float my = originY + (radius + dy + 0.5f) * tile;
                 Color c = marker.type() == MapMarker.Type.DEATH ? deathColor : markerColor;
@@ -158,6 +170,9 @@ public final class MinimapRenderer {
                 float dx = enemy.getRenderX() - player.getRenderX();
                 float dy = enemy.getRenderY() - player.getRenderY();
                 if (Math.abs(dx) > radius || Math.abs(dy) > radius) {
+                    continue;
+                }
+                if (explored != null && !explored.test(enemy.getGridX(), enemy.getGridY())) {
                     continue;
                 }
                 float ex = originX + (radius + dx + 0.5f) * tile;
@@ -185,5 +200,13 @@ public final class MinimapRenderer {
 
     public void dispose() {
         shapeRenderer.dispose();
+    }
+
+    private boolean roomExplored(Room room, java.util.function.BiPredicate<Integer, Integer> explored) {
+        if (explored == null) return true;
+        return explored.test(room.x, room.y)
+                || explored.test(room.x + room.width - 1, room.y)
+                || explored.test(room.x, room.y + room.height - 1)
+                || explored.test(room.x + room.width - 1, room.y + room.height - 1);
     }
 }

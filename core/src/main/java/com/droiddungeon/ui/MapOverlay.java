@@ -3,6 +3,8 @@ package com.droiddungeon.ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.badlogic.gdx.Gdx;
@@ -33,6 +35,7 @@ public final class MapOverlay {
     private final GlyphLayout layout = new GlyphLayout();
     private final AtomicInteger idGen = new AtomicInteger(1);
     private final List<MapMarker> markers = new ArrayList<>();
+    private final Set<Long> explored = new HashSet<>();
 
     private boolean open;
     private float camX;
@@ -92,6 +95,29 @@ public final class MapOverlay {
 
     public MapMarker getTracked() {
         return trackedMarkerId < 0 ? null : markers.stream().filter(m -> m.id() == trackedMarkerId).findFirst().orElse(null);
+    }
+
+    public boolean isExplored(int x, int y) {
+        return explored.contains(key(x, y));
+    }
+
+    public void clearExplored() {
+        explored.clear();
+    }
+
+    public void revealAround(Player player, int radius) {
+        if (player == null || radius <= 0) {
+            return;
+        }
+        int cx = player.getGridX();
+        int cy = player.getGridY();
+        int r2 = radius * radius;
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy > r2) continue;
+                explored.add(key(cx + dx, cy + dy));
+            }
+        }
     }
 
     public void update(float deltaSeconds, Viewport uiViewport, Grid grid) {
@@ -214,10 +240,24 @@ public final class MapOverlay {
         camY = MathUtils.clamp(camY, minY, maxY);
     }
 
+    private boolean isRoomExplored(com.droiddungeon.grid.DungeonGenerator.Room room) {
+        // quick check on corners; if none explored, skip drawing
+        return isExplored(room.x, room.y)
+                || isExplored(room.x + room.width - 1, room.y)
+                || isExplored(room.x, room.y + room.height - 1)
+                || isExplored(room.x + room.width - 1, room.y + room.height - 1);
+    }
+
+    private long key(int x, int y) {
+        return ((long) x << 32) ^ (y & 0xffffffffL);
+    }
+
     public void render(Viewport uiViewport, Grid grid, Player player, float companionX, float companionY, java.util.List<Enemy> enemies) {
         if (!open) {
             return;
         }
+        // reveal current vicinity every frame (idempotent)
+        revealAround(player, 10);
         Rectangle mapArea = mapRect(uiViewport);
         Rectangle listArea = listRect(uiViewport, mapArea);
 
@@ -333,10 +373,15 @@ public final class MapOverlay {
         shapeRenderer.begin(ShapeType.Filled);
         for (int y = minTileY; y <= maxTileY; y++) {
             for (int x = minTileX; x <= maxTileX; x++) {
-                TileMaterial mat = grid.getTileMaterial(x, y);
-                Color base = mat.colorForParity(x + y);
                 float sx = centerX + (x - camX) * zoom;
                 float sy = centerY + (y - camY) * zoom;
+                if (!isExplored(x, y)) {
+                    shapeRenderer.setColor(Color.BLACK);
+                    shapeRenderer.rect(sx, sy, zoom, zoom);
+                    continue;
+                }
+                TileMaterial mat = grid.getTileMaterial(x, y);
+                Color base = mat.colorForParity(x + y);
                 shapeRenderer.setColor(base.r, base.g, base.b, 1f);
                 shapeRenderer.rect(sx, sy, zoom, zoom);
             }
@@ -357,6 +402,9 @@ public final class MapOverlay {
 
         shapeRenderer.begin(ShapeType.Filled);
         for (com.droiddungeon.grid.DungeonGenerator.Room room : rooms) {
+            if (!isRoomExplored(room)) {
+                continue;
+            }
             Color tint = room.type == com.droiddungeon.grid.DungeonGenerator.RoomType.SAFE ? new Color(0.30f, 0.55f, 0.95f, 1f) : new Color(0.82f, 0.25f, 0.25f, 1f);
             shapeRenderer.setColor(tint);
             float x0 = centerX + (room.x - camX) * zoom - pad;
@@ -386,6 +434,9 @@ public final class MapOverlay {
 
         shapeRenderer.begin(ShapeType.Filled);
         for (MapMarker marker : markers) {
+            if (!isExplored(marker.x(), marker.y())) {
+                continue;
+            }
             float sx = centerX + (marker.x() - camX) * zoom;
             float sy = centerY + (marker.y() - camY) * zoom;
             Color c = colorFor(marker.type());
@@ -403,6 +454,9 @@ public final class MapOverlay {
 
         spriteBatch.begin();
         for (MapMarker marker : markers) {
+            if (!isExplored(marker.x(), marker.y())) {
+                continue;
+            }
             float sx = centerX + (marker.x() - camX) * zoom;
             float sy = centerY + (marker.y() - camY) * zoom + 12f;
             font.setColor(marker.tracked() ? Color.WHITE : new Color(0.9f, 0.9f, 0.9f, 1f));
@@ -425,6 +479,9 @@ public final class MapOverlay {
             float size = Math.max(4f, zoom * 0.35f);
             float half = size * 0.5f;
             for (Enemy enemy : enemies) {
+                if (!isExplored(enemy.getGridX(), enemy.getGridY())) {
+                    continue;
+                }
                 float ex = centerX + (enemy.getRenderX() - camX + 0.5f) * zoom;
                 float ey = centerY + (enemy.getRenderY() - camY + 0.5f) * zoom;
                 shapeRenderer.setColor(enemyColor);

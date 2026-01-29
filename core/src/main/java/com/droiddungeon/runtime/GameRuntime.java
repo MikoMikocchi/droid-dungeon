@@ -99,6 +99,8 @@ public final class GameRuntime {
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
         weaponState = weaponSystem.getState();
+        mapOverlay.clearExplored();
+        mapOverlay.revealAround(context.player(), 10);
         seedDemoItems();
         runStateManager = new RunStateManager();
     }
@@ -171,6 +173,8 @@ public final class GameRuntime {
         weaponState = weaponSystem.getState();
         inventorySystem.forceCloseInventory();
         mapOverlay.close();
+        mapOverlay.clearExplored();
+        mapOverlay.revealAround(context.player(), 10);
     }
 
     private void seedDemoItems() {

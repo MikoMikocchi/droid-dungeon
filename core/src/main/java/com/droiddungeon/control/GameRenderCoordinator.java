@@ -71,6 +71,8 @@ public final class GameRenderCoordinator {
                 delta,
                 ctx.playerStats()
         );
+        // keep minimap fog in sync even when full map is closed
+        mapOverlay.revealAround(ctx.player(), 10);
         minimapRenderer.render(
                 uiViewport,
                 ctx.grid(),
@@ -79,7 +81,8 @@ public final class GameRenderCoordinator {
                 ctx.companionSystem().getRenderY(),
                 ctx.enemySystem().getEnemies(),
                 mapOverlay.getMarkers(),
-                mapOverlay.getTracked()
+                mapOverlay.getTracked(),
+                (x, y) -> mapOverlay.isExplored(x, y)
         );
         debugOverlay.render(uiViewport, debugText);
 
