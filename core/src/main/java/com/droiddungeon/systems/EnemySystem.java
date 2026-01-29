@@ -218,6 +218,8 @@ public final class EnemySystem {
         if (occupied.contains(nextKey)) {
             return false;
         }
+        int fromX = enemy.getGridX();
+        int fromY = enemy.getGridY();
         if (!enemy.moveTo(nextX, nextY, grid)) {
             return false;
         }
@@ -225,6 +227,9 @@ public final class EnemySystem {
         long oldKey = key(enemy.getGridX() - dx, enemy.getGridY() - dy);
         occupied.remove(oldKey);
         occupied.add(nextKey);
+        if (entityWorld != null && (fromX != nextX || fromY != nextY)) {
+            entityWorld.move(enemy, fromX, fromY, nextX, nextY);
+        }
         return true;
     }
 

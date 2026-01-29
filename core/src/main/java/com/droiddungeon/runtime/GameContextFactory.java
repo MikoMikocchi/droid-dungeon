@@ -60,7 +60,7 @@ public final class GameContextFactory {
 
         Player player = new Player(EntityIds.next(), spawnX, spawnY);
         PlayerStats playerStats = new PlayerStats(100f);
-        CompanionSystem companionSystem = new CompanionSystem(EntityIds.next(), player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
+        CompanionSystem companionSystem = new CompanionSystem(EntityIds.next(), player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond(), entityWorld);
         WeaponSystem weaponSystem = setupWeapons();
         entityWorld.add(player);
         entityWorld.add(companionSystem);

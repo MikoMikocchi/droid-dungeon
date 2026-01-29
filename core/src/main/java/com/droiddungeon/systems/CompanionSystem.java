@@ -12,6 +12,7 @@ import com.droiddungeon.entity.RenderableEntity;
  */
 public final class CompanionSystem implements RenderableEntity, DamageableEntity {
     private final int id;
+    private final com.droiddungeon.entity.EntityWorld entityWorld;
     private final int delayTiles;
     private final float speedTilesPerSecond;
     private final Deque<int[]> trail = new ArrayDeque<>();
@@ -23,10 +24,11 @@ public final class CompanionSystem implements RenderableEntity, DamageableEntity
     private int lastPlayerGridX;
     private int lastPlayerGridY;
 
-    public CompanionSystem(int id, int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond) {
+    public CompanionSystem(int id, int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond, com.droiddungeon.entity.EntityWorld entityWorld) {
         this.id = id;
         this.delayTiles = Math.max(0, delayTiles);
         this.speedTilesPerSecond = Math.max(0f, speedTilesPerSecond);
+        this.entityWorld = entityWorld;
         this.gridX = startGridX;
         this.gridY = startGridY;
         this.renderX = startGridX;
@@ -59,6 +61,8 @@ public final class CompanionSystem implements RenderableEntity, DamageableEntity
         if (playerGridX == lastPlayerGridX && playerGridY == lastPlayerGridY) {
             return;
         }
+        int fromX = gridX;
+        int fromY = gridY;
         trail.addLast(new int[]{playerGridX, playerGridY});
         while (trail.size() > delayTiles) {
             int[] next = trail.removeFirst();
@@ -67,6 +71,9 @@ public final class CompanionSystem implements RenderableEntity, DamageableEntity
         }
         lastPlayerGridX = playerGridX;
         lastPlayerGridY = playerGridY;
+        if (entityWorld != null && (fromX != gridX || fromY != gridY)) {
+            entityWorld.move(this, fromX, fromY, gridX, gridY);
+        }
     }
 
     public void updateRender(float deltaSeconds) {

@@ -42,12 +42,17 @@ public final class HeldMovementController {
             return;
         }
 
-        int targetX = player.getGridX() + chosen.dx;
-        int targetY = player.getGridY() + chosen.dy;
+        int oldX = player.getGridX();
+        int oldY = player.getGridY();
+        int targetX = oldX + chosen.dx;
+        int targetY = oldY + chosen.dy;
         if (entityWorld != null && entityWorld.isBlocked(targetX, targetY)) {
             return;
         }
         player.tryMoveBy(chosen.dx, chosen.dy, grid);
+        if (entityWorld != null && (player.getGridX() != oldX || player.getGridY() != oldY)) {
+            entityWorld.move(player, oldX, oldY, player.getGridX(), player.getGridY());
+        }
     }
 
     private static Direction chooseDirection(
