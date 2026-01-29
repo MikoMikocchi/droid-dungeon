@@ -2,14 +2,14 @@ package com.droiddungeon.input;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
-import com.droiddungeon.systems.EnemySystem;
 
 public final class HeldMovementController {
     private Direction preferredDir = Direction.RIGHT;
 
-    public void update(Grid grid, Player player, EnemySystem enemySystem) {
+    public void update(Grid grid, Player player, EntityWorld entityWorld) {
         if (player.isMoving()) {
             return;
         }
@@ -44,7 +44,7 @@ public final class HeldMovementController {
 
         int targetX = player.getGridX() + chosen.dx;
         int targetY = player.getGridY() + chosen.dy;
-        if (enemySystem != null && enemySystem.isTileOccupied(targetX, targetY)) {
+        if (entityWorld != null && entityWorld.isBlocked(targetX, targetY)) {
             return;
         }
         player.tryMoveBy(chosen.dx, chosen.dy, grid);

@@ -8,6 +8,8 @@ import java.util.Set;
 
 import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.enemies.EnemyType;
+import com.droiddungeon.entity.EntityIds;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -19,13 +21,15 @@ import com.droiddungeon.player.PlayerStats;
 public final class EnemySystem {
     private final Grid grid;
     private final long worldSeed;
+    private final EntityWorld entityWorld;
     private final List<Enemy> enemies = new ArrayList<>();
     private final Set<String> spawnedRooms = new HashSet<>();
     private final Random ambientRng;
 
-    public EnemySystem(Grid grid, long worldSeed) {
+    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld) {
         this.grid = grid;
         this.worldSeed = worldSeed;
+        this.entityWorld = entityWorld;
         this.ambientRng = new Random(worldSeed ^ 0xACEDBADEL);
     }
 
@@ -33,16 +37,9 @@ public final class EnemySystem {
         return enemies;
     }
 
-    public boolean isTileOccupied(int x, int y) {
-        for (Enemy enemy : enemies) {
-            if (enemy.isDead()) {
-                continue;
-            }
-            if (enemy.getGridX() == x && enemy.getGridY() == y) {
-                return true;
-            }
-        }
-        return false;
+    public void reset() {
+        enemies.clear();
+        spawnedRooms.clear();
     }
 
     public void update(float deltaSeconds, Player player, PlayerStats playerStats, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
@@ -77,7 +74,15 @@ public final class EnemySystem {
             enemy.updateRender(deltaSeconds);
         }
 
-        enemies.removeIf(Enemy::isDead);
+        enemies.removeIf(enemy -> {
+            if (enemy.isDead()) {
+                if (entityWorld != null) {
+                    entityWorld.remove(enemy);
+                }
+                return true;
+            }
+            return false;
+        });
     }
 
     private void spawnNearby(Player player) {
@@ -129,6 +134,7 @@ public final class EnemySystem {
                 continue;
             }
             Enemy enemy = new Enemy(
+                    EntityIds.next(),
                     EnemyType.CATSTER,
                     spawnX,
                     spawnY,
@@ -138,6 +144,9 @@ public final class EnemySystem {
                     room.y + room.height - 1
             );
             enemies.add(enemy);
+            if (entityWorld != null) {
+                entityWorld.add(enemy);
+            }
         }
     }
 

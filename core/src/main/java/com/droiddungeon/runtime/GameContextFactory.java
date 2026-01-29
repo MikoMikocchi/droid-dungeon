@@ -2,6 +2,8 @@ package com.droiddungeon.runtime;
 
 import com.badlogic.gdx.math.MathUtils;
 import com.droiddungeon.config.GameConfig;
+import com.droiddungeon.entity.EntityIds;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
@@ -24,6 +26,7 @@ public final class GameContextFactory {
     private final Inventory inventory;
     private final InventorySystem inventorySystem;
     private final ItemRegistry itemRegistry;
+    private final EntityWorld entityWorld;
     private final EnemySystem enemySystem;
 
     public GameContextFactory(
@@ -35,6 +38,7 @@ public final class GameContextFactory {
             Inventory inventory,
             InventorySystem inventorySystem,
             ItemRegistry itemRegistry,
+            EntityWorld entityWorld,
             EnemySystem enemySystem
     ) {
         this.config = config;
@@ -45,17 +49,24 @@ public final class GameContextFactory {
         this.inventory = inventory;
         this.inventorySystem = inventorySystem;
         this.itemRegistry = itemRegistry;
+        this.entityWorld = entityWorld;
         this.enemySystem = enemySystem;
     }
 
     public GameContext createContext() {
-        Player player = new Player(spawnX, spawnY);
+        entityWorld.clear();
+        enemySystem.reset();
+
+        Player player = new Player(EntityIds.next(), spawnX, spawnY);
         PlayerStats playerStats = new PlayerStats(100f);
-        CompanionSystem companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
+        CompanionSystem companionSystem = new CompanionSystem(EntityIds.next(), player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
         WeaponSystem weaponSystem = setupWeapons();
+        entityWorld.add(player);
+        entityWorld.add(companionSystem);
 
         return new GameContext(
                 grid,
+                entityWorld,
                 player,
                 playerStats,
                 companionSystem,

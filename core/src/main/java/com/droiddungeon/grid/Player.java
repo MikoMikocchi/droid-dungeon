@@ -1,17 +1,37 @@
 package com.droiddungeon.grid;
 
-public final class Player {
+import com.droiddungeon.entity.EntityLayer;
+import com.droiddungeon.entity.RenderableEntity;
+
+public final class Player implements RenderableEntity {
+    private final int id;
     private int gridX;
     private int gridY;
 
     private float renderX;
     private float renderY;
 
-    public Player(int gridX, int gridY) {
+    public Player(int id, int gridX, int gridY) {
+        this.id = id;
         this.gridX = gridX;
         this.gridY = gridY;
         this.renderX = gridX;
         this.renderY = gridY;
+    }
+
+    @Override
+    public int id() {
+        return id;
+    }
+
+    @Override
+    public EntityLayer layer() {
+        return EntityLayer.ACTOR;
+    }
+
+    @Override
+    public boolean blocking() {
+        return true;
     }
 
     public int getGridX() {
@@ -22,6 +42,26 @@ public final class Player {
         return gridY;
     }
 
+    @Override
+    public int gridX() {
+        return gridX;
+    }
+
+    @Override
+    public int gridY() {
+        return gridY;
+    }
+
+    @Override
+    public float renderX() {
+        return renderX;
+    }
+
+    @Override
+    public float renderY() {
+        return renderY;
+    }
+
     public float getRenderX() {
         return renderX;
     }
@@ -30,6 +70,7 @@ public final class Player {
         return renderY;
     }
 
+    @Override
     public boolean isMoving() {
         return Math.abs(renderX - gridX) > 0.001f || Math.abs(renderY - gridY) > 0.001f;
     }

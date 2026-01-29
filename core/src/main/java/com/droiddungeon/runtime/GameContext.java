@@ -1,5 +1,6 @@
 package com.droiddungeon.runtime;
 
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
@@ -15,6 +16,7 @@ import com.droiddungeon.systems.WeaponSystem;
  */
 public record GameContext(
         Grid grid,
+        EntityWorld entityWorld,
         Player player,
         PlayerStats playerStats,
         CompanionSystem companionSystem,

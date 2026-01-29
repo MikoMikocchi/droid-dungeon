@@ -11,6 +11,7 @@ import com.droiddungeon.control.GameRenderCoordinator;
 import com.droiddungeon.control.GameUpdater;
 import com.droiddungeon.control.MapController;
 import com.droiddungeon.debug.DebugTextBuilder;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.input.GameInputController;
@@ -55,6 +56,7 @@ public final class GameRuntime {
     private Inventory inventory;
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
+    private EntityWorld entityWorld;
     private EnemySystem enemySystem;
 
     private WeaponSystem weaponSystem;
@@ -91,8 +93,9 @@ public final class GameRuntime {
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
-        enemySystem = new EnemySystem(grid, worldSeed);
-        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, enemySystem);
+        entityWorld = new EntityWorld();
+        enemySystem = new EnemySystem(grid, worldSeed, entityWorld);
+        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
         weaponState = weaponSystem.getState();

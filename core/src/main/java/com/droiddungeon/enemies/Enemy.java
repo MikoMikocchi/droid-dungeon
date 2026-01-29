@@ -1,11 +1,14 @@
 package com.droiddungeon.enemies;
 
+import com.droiddungeon.entity.EntityLayer;
+import com.droiddungeon.entity.RenderableEntity;
 import com.droiddungeon.grid.Grid;
 
 /**
  * Runtime enemy instance (position, timers, room bounds).
  */
-public final class Enemy {
+public final class Enemy implements RenderableEntity {
+    private final int id;
     private final EnemyType type;
     private final int roomMinX;
     private final int roomMinY;
@@ -24,7 +27,8 @@ public final class Enemy {
     private float health;
     private int lastHitSwing = -1;
 
-    public Enemy(EnemyType type, int spawnX, int spawnY, int roomMinX, int roomMinY, int roomMaxX, int roomMaxY) {
+    public Enemy(int id, EnemyType type, int spawnX, int spawnY, int roomMinX, int roomMinY, int roomMaxX, int roomMaxY) {
+        this.id = id;
         this.type = type;
         this.gridX = spawnX;
         this.gridY = spawnY;
@@ -42,6 +46,21 @@ public final class Enemy {
         this.health = type.maxHealth();
     }
 
+    @Override
+    public int id() {
+        return id;
+    }
+
+    @Override
+    public EntityLayer layer() {
+        return EntityLayer.ACTOR;
+    }
+
+    @Override
+    public boolean blocking() {
+        return true;
+    }
+
     public EnemyType getType() {
         return type;
     }
@@ -52,6 +71,26 @@ public final class Enemy {
 
     public int getGridY() {
         return gridY;
+    }
+
+    @Override
+    public int gridX() {
+        return gridX;
+    }
+
+    @Override
+    public int gridY() {
+        return gridY;
+    }
+
+    @Override
+    public float renderX() {
+        return renderX;
+    }
+
+    @Override
+    public float renderY() {
+        return renderY;
     }
 
     public float getRenderX() {
@@ -78,6 +117,7 @@ public final class Enemy {
         return homeY;
     }
 
+    @Override
     public boolean isMoving() {
         return Math.abs(renderX - gridX) > 0.001f || Math.abs(renderY - gridY) > 0.001f;
     }

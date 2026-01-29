@@ -40,7 +40,7 @@ public final class GameUpdater {
             }
 
             if (!ctx.inventorySystem().isInventoryOpen()) {
-                movementController.update(ctx.grid(), ctx.player(), ctx.enemySystem());
+                movementController.update(ctx.grid(), ctx.player(), ctx.entityWorld());
             }
             ctx.companionSystem().updateFollowerTrail(ctx.player().getGridX(), ctx.player().getGridY());
             ctx.player().update(delta, config.playerSpeedTilesPerSecond());

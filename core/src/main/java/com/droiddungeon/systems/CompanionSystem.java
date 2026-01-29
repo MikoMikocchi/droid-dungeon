@@ -3,10 +3,14 @@ package com.droiddungeon.systems;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import com.droiddungeon.entity.EntityLayer;
+import com.droiddungeon.entity.RenderableEntity;
+
 /**
  * Handles follower movement logic: grid trail + smooth render interpolation.
  */
-public final class CompanionSystem {
+public final class CompanionSystem implements RenderableEntity {
+    private final int id;
     private final int delayTiles;
     private final float speedTilesPerSecond;
     private final Deque<int[]> trail = new ArrayDeque<>();
@@ -18,7 +22,8 @@ public final class CompanionSystem {
     private int lastPlayerGridX;
     private int lastPlayerGridY;
 
-    public CompanionSystem(int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond) {
+    public CompanionSystem(int id, int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond) {
+        this.id = id;
         this.delayTiles = Math.max(0, delayTiles);
         this.speedTilesPerSecond = Math.max(0f, speedTilesPerSecond);
         this.gridX = startGridX;
@@ -32,6 +37,21 @@ public final class CompanionSystem {
         for (int i = 0; i < this.delayTiles; i++) {
             trail.addLast(new int[]{startGridX, startGridY});
         }
+    }
+
+    @Override
+    public int id() {
+        return id;
+    }
+
+    @Override
+    public EntityLayer layer() {
+        return EntityLayer.ACTOR;
+    }
+
+    @Override
+    public boolean blocking() {
+        return false;
     }
 
     public void updateFollowerTrail(int playerGridX, int playerGridY) {
@@ -78,11 +98,36 @@ public final class CompanionSystem {
         return gridY;
     }
 
+    @Override
+    public int gridX() {
+        return gridX;
+    }
+
+    @Override
+    public int gridY() {
+        return gridY;
+    }
+
+    @Override
+    public float renderX() {
+        return renderX;
+    }
+
+    @Override
+    public float renderY() {
+        return renderY;
+    }
+
     public float getRenderX() {
         return renderX;
     }
 
     public float getRenderY() {
         return renderY;
+    }
+
+    @Override
+    public boolean isMoving() {
+        return Math.abs(renderX - gridX) > 0.001f || Math.abs(renderY - gridY) > 0.001f;
     }
 }
