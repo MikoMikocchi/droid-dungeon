@@ -82,11 +82,11 @@ public final class GameContextFactory {
     private WeaponSystem setupWeapons() {
         WeaponSystem weaponSystem = new WeaponSystem();
         weaponSystem.register("steel_rapier", new WeaponSystem.WeaponSpec(
-                MathUtils.degreesToRadians * 20f,
+                MathUtils.degreesToRadians * 10f,
                 3.4f,
                 0.42f,
                 0.22f,
-                0.55f,
+                0.1f,
                 12f
         ));
         return weaponSystem;
