@@ -23,6 +23,7 @@ import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.render.RenderAssets;
 import com.droiddungeon.systems.CameraController;
+import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.ui.MapOverlay;
@@ -54,6 +55,7 @@ public final class GameRuntime {
     private Inventory inventory;
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
+    private EnemySystem enemySystem;
 
     private WeaponSystem weaponSystem;
     private WeaponSystem.WeaponState weaponState;
@@ -89,7 +91,8 @@ public final class GameRuntime {
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid);
-        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry);
+        enemySystem = new EnemySystem(grid, worldSeed);
+        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, enemySystem);
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
         weaponState = weaponSystem.getState();
@@ -113,13 +116,12 @@ public final class GameRuntime {
         }
 
         InputFrame input = inputController.collect(uiViewport, inventorySystem);
-        boolean mapOpen = mapController.update(input, mapOverlay, renderer.debugOverlay(), uiViewport, context);
+        boolean mapOpen = mapController.update(input, mapOverlay, renderer.minimapBounds(), uiViewport, context);
 
         Vector2 mouseWorld = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
 
         GameUpdateResult updateResult = updater.update(
                 delta,
-                mapOpen,
                 runStateManager.isDead(),
                 input,
                 context,

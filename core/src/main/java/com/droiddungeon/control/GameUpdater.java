@@ -23,12 +23,12 @@ public final class GameUpdater {
         this.movementController = movementController;
     }
 
-    public GameUpdateResult update(float delta, boolean mapOpen, boolean dead, InputFrame input, GameContext ctx, float worldViewportTileSize, Vector2 mouseWorld) {
+    public GameUpdateResult update(float delta, boolean dead, InputFrame input, GameContext ctx, float worldViewportTileSize, Vector2 mouseWorld) {
         float gridOriginX;
         float gridOriginY;
         WeaponSystem.WeaponState weaponState;
 
-        if (!dead && !mapOpen) {
+        if (!dead) {
             if (input.dropRequested()) {
                 ctx.inventorySystem().dropCurrentStack(ctx.player());
             }

@@ -24,6 +24,7 @@ public final class GameContextFactory {
     private final Inventory inventory;
     private final InventorySystem inventorySystem;
     private final ItemRegistry itemRegistry;
+    private final EnemySystem enemySystem;
 
     public GameContextFactory(
             GameConfig config,
@@ -33,7 +34,8 @@ public final class GameContextFactory {
             long worldSeed,
             Inventory inventory,
             InventorySystem inventorySystem,
-            ItemRegistry itemRegistry
+            ItemRegistry itemRegistry,
+            EnemySystem enemySystem
     ) {
         this.config = config;
         this.grid = grid;
@@ -43,13 +45,13 @@ public final class GameContextFactory {
         this.inventory = inventory;
         this.inventorySystem = inventorySystem;
         this.itemRegistry = itemRegistry;
+        this.enemySystem = enemySystem;
     }
 
     public GameContext createContext() {
         Player player = new Player(spawnX, spawnY);
         PlayerStats playerStats = new PlayerStats(100f);
         CompanionSystem companionSystem = new CompanionSystem(player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond());
-        EnemySystem enemySystem = new EnemySystem(grid, worldSeed);
         WeaponSystem weaponSystem = setupWeapons();
 
         return new GameContext(

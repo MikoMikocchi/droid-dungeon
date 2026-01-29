@@ -18,6 +18,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
@@ -213,7 +214,7 @@ public final class MapOverlay {
         camY = MathUtils.clamp(camY, minY, maxY);
     }
 
-    public void render(Viewport uiViewport, Grid grid, Player player, float companionX, float companionY) {
+    public void render(Viewport uiViewport, Grid grid, Player player, float companionX, float companionY, java.util.List<Enemy> enemies) {
         if (!open) {
             return;
         }
@@ -262,7 +263,7 @@ public final class MapOverlay {
         gl.glScissor(sx, sy, sw, sh);
 
         renderTiles(grid, mapArea);
-        renderMarkers(mapArea, player, companionX, companionY);
+        renderMarkers(mapArea, player, companionX, companionY, enemies);
 
         gl.glDisable(com.badlogic.gdx.graphics.GL20.GL_SCISSOR_TEST);
 
@@ -379,7 +380,7 @@ public final class MapOverlay {
         shapeRenderer.end();
     }
 
-    private void renderMarkers(Rectangle mapArea, Player player, float companionX, float companionY) {
+    private void renderMarkers(Rectangle mapArea, Player player, float companionX, float companionY, java.util.List<Enemy> enemies) {
         float centerX = mapArea.x + mapArea.width * 0.5f;
         float centerY = mapArea.y + mapArea.height * 0.5f;
 
@@ -419,6 +420,17 @@ public final class MapOverlay {
         shapeRenderer.rect(px - 4f, py - 4f, 8f, 8f);
         shapeRenderer.setColor(0.35f, 0.85f, 0.95f, 1f);
         shapeRenderer.rect(cx - 3f, cy - 3f, 6f, 6f);
+        if (enemies != null) {
+            Color enemyColor = new Color(0.86f, 0.32f, 0.32f, 1f);
+            float size = Math.max(4f, zoom * 0.35f);
+            float half = size * 0.5f;
+            for (Enemy enemy : enemies) {
+                float ex = centerX + (enemy.getRenderX() - camX + 0.5f) * zoom;
+                float ey = centerY + (enemy.getRenderY() - camY + 0.5f) * zoom;
+                shapeRenderer.setColor(enemyColor);
+                shapeRenderer.rect(ex - half, ey - half, size, size);
+            }
+        }
         shapeRenderer.end();
     }
 

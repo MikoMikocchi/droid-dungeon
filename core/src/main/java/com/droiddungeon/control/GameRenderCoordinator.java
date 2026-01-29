@@ -8,6 +8,7 @@ import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
+import com.droiddungeon.ui.MinimapRenderer;
 import com.droiddungeon.ui.MapOverlay;
 
 /**
@@ -16,6 +17,7 @@ import com.droiddungeon.ui.MapOverlay;
 public final class GameRenderCoordinator {
     private final WorldRenderer worldRenderer = new WorldRenderer();
     private final HudRenderer hudRenderer = new HudRenderer();
+    private final MinimapRenderer minimapRenderer = new MinimapRenderer();
     private final DebugOverlay debugOverlay = new DebugOverlay();
 
     public boolean render(
@@ -69,20 +71,28 @@ public final class GameRenderCoordinator {
                 delta,
                 ctx.playerStats()
         );
-        debugOverlay.render(
+        minimapRenderer.render(
                 uiViewport,
                 ctx.grid(),
                 ctx.player(),
                 ctx.companionSystem().getRenderX(),
                 ctx.companionSystem().getRenderY(),
-                debugText,
+                ctx.enemySystem().getEnemies(),
                 mapOverlay.getMarkers(),
                 mapOverlay.getTracked()
         );
+        debugOverlay.render(uiViewport, debugText);
 
         if (mapOpen) {
             mapOverlay.update(delta, uiViewport, ctx.grid());
-            mapOverlay.render(uiViewport, ctx.grid(), ctx.player(), ctx.companionSystem().getRenderX(), ctx.companionSystem().getRenderY());
+            mapOverlay.render(
+                    uiViewport,
+                    ctx.grid(),
+                    ctx.player(),
+                    ctx.companionSystem().getRenderX(),
+                    ctx.companionSystem().getRenderY(),
+                    ctx.enemySystem().getEnemies()
+            );
         }
 
         boolean restartHovered = false;
@@ -96,6 +106,7 @@ public final class GameRenderCoordinator {
     public void dispose() {
         worldRenderer.dispose();
         hudRenderer.dispose();
+        minimapRenderer.dispose();
         debugOverlay.dispose();
     }
 
@@ -105,6 +116,10 @@ public final class GameRenderCoordinator {
 
     public DebugOverlay debugOverlay() {
         return debugOverlay;
+    }
+
+    public com.badlogic.gdx.math.Rectangle minimapBounds() {
+        return minimapRenderer.getLastBounds();
     }
 
     private boolean isRestartHovered(Viewport uiViewport) {
