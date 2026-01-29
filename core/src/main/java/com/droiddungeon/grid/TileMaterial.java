@@ -13,12 +13,15 @@ public enum TileMaterial {
     private final String displayName;
     private final Color lightColor;
     private final Color darkColor;
+    private final Color flatColor;
     private final boolean walkable;
 
     TileMaterial(String displayName, Color lightColor, Color darkColor, boolean walkable) {
         this.displayName = displayName;
         this.lightColor = lightColor;
         this.darkColor = darkColor;
+        // Use a stable middle tone to avoid checkerboard parity artifacts in rendering.
+        this.flatColor = new Color(lightColor).lerp(darkColor, 0.45f);
         this.walkable = walkable;
     }
 
@@ -35,7 +38,7 @@ public enum TileMaterial {
     }
 
     public Color colorForParity(int parity) {
-        return (parity & 1) == 0 ? lightColor : darkColor;
+        return flatColor;
     }
 
     public boolean isWalkable() {

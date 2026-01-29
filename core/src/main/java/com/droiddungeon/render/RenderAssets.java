@@ -23,6 +23,10 @@ public final class RenderAssets {
     private static TextureRegion dottyRegion;
     private static Texture catsterTexture;
     private static TextureRegion catsterRegion;
+    private static Texture floorTexture;
+    private static TextureRegion floorRegion;
+    private static Texture wallAutoTexture;
+    private static TextureRegion[] wallAutoRegions;
 
     private RenderAssets() {
     }
@@ -75,6 +79,16 @@ public final class RenderAssets {
             catsterTexture = null;
             catsterRegion = null;
         }
+        if (floorTexture != null) {
+            floorTexture.dispose();
+            floorTexture = null;
+            floorRegion = null;
+        }
+        if (wallAutoTexture != null) {
+            wallAutoTexture.dispose();
+            wallAutoTexture = null;
+            wallAutoRegions = null;
+        }
     }
 
     public static TextureRegion playerRegion() {
@@ -102,6 +116,35 @@ public final class RenderAssets {
             catsterRegion = new TextureRegion(catsterTexture);
         }
         return catsterRegion;
+    }
+
+    public static TextureRegion floorRegion() {
+        if (floorRegion == null) {
+            floorTexture = new Texture(Gdx.files.internal("textures/tiles/floor_base.png"));
+            floorTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            floorRegion = new TextureRegion(floorTexture);
+        }
+        return floorRegion;
+    }
+
+    /**
+     * Returns a 16-entry autotile set laid out in the order of a 4-bit mask:
+     * bit 0 = north, bit 1 = east, bit 2 = south, bit 3 = west.
+     */
+    public static TextureRegion[] wallAutoTiles() {
+        if (wallAutoRegions == null) {
+            wallAutoTexture = new Texture(Gdx.files.internal("textures/tiles/wall_autotile.png"));
+            wallAutoTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+            TextureRegion[][] split = TextureRegion.split(wallAutoTexture, 32, 32);
+            wallAutoRegions = new TextureRegion[16];
+            int idx = 0;
+            for (int row = 0; row < split.length && idx < 16; row++) {
+                for (int col = 0; col < split[row].length && idx < 16; col++) {
+                    wallAutoRegions[idx++] = split[row][col];
+                }
+            }
+        }
+        return wallAutoRegions;
     }
 
     private static BitmapFont loadFont(int size) {

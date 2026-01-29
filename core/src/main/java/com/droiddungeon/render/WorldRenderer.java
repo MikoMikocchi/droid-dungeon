@@ -35,6 +35,8 @@ public final class WorldRenderer {
     private final TextureRegion playerRegion;
     private final TextureRegion dottyRegion;
     private final TextureRegion catsterRegion;
+    private final TextureRegion floorRegion;
+    private final TextureRegion[] wallAutoTiles;
     private final Color tempColor = new Color();
     private static final Color HIT_FLASH = new Color(1f, 0.35f, 0.35f, 1f);
     private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
@@ -46,6 +48,8 @@ public final class WorldRenderer {
         playerRegion = RenderAssets.playerRegion();
         dottyRegion = RenderAssets.dottyRegion();
         catsterRegion = RenderAssets.catsterRegion();
+        floorRegion = RenderAssets.floorRegion();
+        wallAutoTiles = RenderAssets.wallAutoTiles();
     }
 
     public void render(
@@ -69,8 +73,10 @@ public final class WorldRenderer {
         float tileSize = grid.getTileSize();
         VisibleWindow visible = VisibleWindow.from(viewport, tileSize);
 
+        spriteBatch.begin();
         renderTileFill(grid, tileSize, visible);
-        renderGridLines(tileSize, visible);
+        spriteBatch.end();
+
         renderRoomCorners(grid, tileSize, visible);
         renderWeaponFan(weaponState, player, gridOriginX, gridOriginY, tileSize);
 
@@ -331,41 +337,39 @@ public final class WorldRenderer {
 
 
     private void renderTileFill(Grid grid, float tileSize, VisibleWindow visible) {
-        shapeRenderer.begin(ShapeType.Filled);
         for (int y = visible.minTileY; y <= visible.maxTileY; y++) {
             for (int x = visible.minTileX; x <= visible.maxTileX; x++) {
                 TileMaterial floor = grid.getTileMaterial(x, y);
                 com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(x, y);
-                shapeRenderer.setColor(colorFor(floor, roomType, x + y));
                 float wx = x * tileSize;
                 float wy = y * tileSize;
-                shapeRenderer.rect(wx, wy, tileSize, tileSize);
+
+                // Floor base
+                Color floorColor = tempColor.set(colorFor(floor, roomType, x + y));
+                spriteBatch.setColor(floorColor);
+                spriteBatch.draw(floorRegion, wx, wy, tileSize, tileSize);
 
                 BlockMaterial block = grid.getBlockMaterial(x, y);
                 if (block != null) {
-                    // Darker overlay to imply volume.
-                    Color blockColor = colorFor(block.floorMaterial(), roomType, x + y).mul(0.9f);
-                    shapeRenderer.setColor(blockColor);
-                    shapeRenderer.rect(wx, wy, tileSize, tileSize);
+                    int mask = exposedMask(grid, x, y);
+                    TextureRegion blockRegion = wallAutoTiles[Math.min(mask, wallAutoTiles.length - 1)];
+                    Color blockColor = tempColor.set(colorFor(block.floorMaterial(), roomType, x + y));
+                    // Darken solid walls heavily; expose more brightness on edges that touch air.
+                    int exposedSides = Integer.bitCount(mask);
+                    float shade = (mask == 0)
+                            ? 0.28f
+                            : 0.45f + 0.12f * exposedSides;
+                    blockColor.mul(shade, shade, shade, 1f);
+                    spriteBatch.setColor(blockColor);
+                    spriteBatch.draw(blockRegion, wx, wy, tileSize, tileSize);
                 }
             }
         }
-        shapeRenderer.end();
+        spriteBatch.setColor(Color.WHITE);
     }
 
     private void renderGridLines(float tileSize, VisibleWindow visible) {
-        shapeRenderer.begin(ShapeType.Line);
-        shapeRenderer.setColor(0.2f, 0.2f, 0.2f, 0.65f);
-
-        for (int x = visible.minTileX; x <= visible.maxTileX + 1; x++) {
-            float worldX = x * tileSize;
-            shapeRenderer.line(worldX, visible.minTileY * tileSize, worldX, (visible.maxTileY + 1) * tileSize);
-        }
-        for (int y = visible.minTileY; y <= visible.maxTileY + 1; y++) {
-            float worldY = y * tileSize;
-            shapeRenderer.line(visible.minTileX * tileSize, worldY, (visible.maxTileX + 1) * tileSize, worldY);
-        }
-        shapeRenderer.end();
+        // Grid lines intentionally disabled (request: remove grid overlay). Keep method for quick re-enable if needed.
     }
 
     private void renderGroundItems(
@@ -433,6 +437,19 @@ public final class WorldRenderer {
     private Color colorFor(TileMaterial material, RoomType roomType, int parity) {
         // RoomType no longer tints fill; only corners use it.
         return tempColor.set(material.colorForParity(parity));
+    }
+
+    private int exposedMask(Grid grid, int x, int y) {
+        int mask = 0;
+        if (isAir(grid, x, y + 1)) mask |= 1; // N
+        if (isAir(grid, x + 1, y)) mask |= 2; // E
+        if (isAir(grid, x, y - 1)) mask |= 4; // S
+        if (isAir(grid, x - 1, y)) mask |= 8; // W
+        return mask;
+    }
+
+    private boolean isAir(Grid grid, int x, int y) {
+        return grid.getBlockMaterial(x, y) == null;
     }
 
     private record VisibleWindow(int minTileX, int minTileY, int maxTileX, int maxTileY) {
