@@ -35,6 +35,7 @@ public final class WorldRenderer {
     private final TextureRegion dottyRegion;
     private final TextureRegion catsterRegion;
     private final Color tempColor = new Color();
+    private static final Color HIT_FLASH = new Color(1f, 0.35f, 0.35f, 1f);
     private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
     private static final Color DANGER_TINT = new Color(0.82f, 0.25f, 0.25f, 1f);
 
@@ -133,8 +134,16 @@ public final class WorldRenderer {
             float centerY = gridOriginY + (enemy.getRenderY() + 0.5f) * tileSize;
             float drawX = centerX - drawSize * 0.5f;
             float drawY = centerY - drawSize * 0.5f;
+            if (enemy.getHitFlashTimer() > 0f) {
+                float t = Math.min(1f, enemy.getHitFlashTimer() / 0.18f);
+                tempColor.set(HIT_FLASH).lerp(Color.WHITE, 1f - t);
+                spriteBatch.setColor(tempColor);
+            } else {
+                spriteBatch.setColor(Color.WHITE);
+            }
             spriteBatch.draw(catsterRegion, drawX, drawY, drawSize, drawSize);
         }
+        spriteBatch.setColor(Color.WHITE);
     }
 
     private void renderCompanionDotty(float gridOriginX, float gridOriginY, float tileSize, float companionX, float companionY) {

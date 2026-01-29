@@ -27,6 +27,7 @@ public final class Enemy implements RenderableEntity, DamageableEntity {
     private boolean hasLineOfSight;
     private float health;
     private int lastHitSwing = -1;
+    private float hitFlashTimer;
 
     public Enemy(int id, EnemyType type, int spawnX, int spawnY, int roomMinX, int roomMinY, int roomMaxX, int roomMaxY) {
         this.id = id;
@@ -45,6 +46,7 @@ public final class Enemy implements RenderableEntity, DamageableEntity {
         this.wanderCooldown = 0f;
         this.hasLineOfSight = false;
         this.health = type.maxHealth();
+        this.hitFlashTimer = 0f;
     }
 
     @Override
@@ -157,6 +159,9 @@ public final class Enemy implements RenderableEntity, DamageableEntity {
         if (wanderCooldown > 0f) {
             wanderCooldown = Math.max(0f, wanderCooldown - deltaSeconds);
         }
+        if (hitFlashTimer > 0f) {
+            hitFlashTimer = Math.max(0f, hitFlashTimer - deltaSeconds);
+        }
     }
 
     public boolean readyToAttack() {
@@ -202,6 +207,7 @@ public final class Enemy implements RenderableEntity, DamageableEntity {
         }
         lastHitSwing = swingIndex;
         health = Math.max(0f, health - amount);
+        hitFlashTimer = 0.18f;
         return true;
     }
 
@@ -221,5 +227,9 @@ public final class Enemy implements RenderableEntity, DamageableEntity {
     @Override
     public float healthRatio() {
         return type.maxHealth() > 0f ? health / type.maxHealth() : 0f;
+    }
+
+    public float getHitFlashTimer() {
+        return hitFlashTimer;
     }
 }
