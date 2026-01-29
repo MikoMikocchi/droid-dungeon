@@ -441,10 +441,23 @@ public final class WorldRenderer {
 
     private int exposedMask(Grid grid, int x, int y) {
         int mask = 0;
-        if (isAir(grid, x, y + 1)) mask |= 1; // N
-        if (isAir(grid, x + 1, y)) mask |= 2; // E
-        if (isAir(grid, x, y - 1)) mask |= 4; // S
-        if (isAir(grid, x - 1, y)) mask |= 8; // W
+        boolean n = isAir(grid, x, y + 1);
+        boolean e = isAir(grid, x + 1, y);
+        boolean s = isAir(grid, x, y - 1);
+        boolean w = isAir(grid, x - 1, y);
+        boolean ne = isAir(grid, x + 1, y + 1);
+        boolean se = isAir(grid, x + 1, y - 1);
+        boolean sw = isAir(grid, x - 1, y - 1);
+        boolean nw = isAir(grid, x - 1, y + 1);
+
+        if (n) mask |= 1;   // N
+        if (e) mask |= 2;   // E
+        if (s) mask |= 4;   // S
+        if (w) mask |= 8;   // W
+        if (ne) mask |= 16; // NE
+        if (se) mask |= 32; // SE
+        if (sw) mask |= 64; // SW
+        if (nw) mask |= 128;// NW
         return mask;
     }
 

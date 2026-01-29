@@ -128,18 +128,25 @@ public final class RenderAssets {
     }
 
     /**
-     * Returns a 16-entry autotile set laid out in the order of a 4-bit mask:
-     * bit 0 = north, bit 1 = east, bit 2 = south, bit 3 = west.
+     * Returns a 256-entry autotile set laid out in the order of an 8-bit mask:
+     * bit 0 = north, bit 1 = east, bit 2 = south, bit 3 = west,
+     * bit 4 = north-east, bit 5 = south-east, bit 6 = south-west, bit 7 = north-west.
+     * Index equals mask value (0-255).
      */
     public static TextureRegion[] wallAutoTiles() {
         if (wallAutoRegions == null) {
             wallAutoTexture = new Texture(Gdx.files.internal("textures/tiles/wall_autotile.png"));
             wallAutoTexture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+
             TextureRegion[][] split = TextureRegion.split(wallAutoTexture, 32, 32);
-            wallAutoRegions = new TextureRegion[16];
+            int rows = split.length;
+            int cols = rows == 0 ? 0 : split[0].length;
+            int total = rows * cols;
+
+            wallAutoRegions = new TextureRegion[total];
             int idx = 0;
-            for (int row = 0; row < split.length && idx < 16; row++) {
-                for (int col = 0; col < split[row].length && idx < 16; col++) {
+            for (int row = 0; row < rows; row++) {
+                for (int col = 0; col < cols; col++) {
                     wallAutoRegions[idx++] = split[row][col];
                 }
             }
