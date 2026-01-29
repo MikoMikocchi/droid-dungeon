@@ -14,12 +14,12 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.enemies.Enemy;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
-import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
@@ -354,11 +354,13 @@ public final class WorldRenderer {
                     int mask = exposedMask(grid, x, y);
                     TextureRegion blockRegion = wallAutoTiles[Math.min(mask, wallAutoTiles.length - 1)];
                     Color blockColor = tempColor.set(colorFor(block.floorMaterial(), roomType, x + y));
-                    // Darken solid walls heavily; expose more brightness on edges that touch air.
-                    int exposedSides = Integer.bitCount(mask);
-                    float shade = (mask == 0)
-                            ? 0.28f
-                            : 0.45f + 0.12f * exposedSides;
+                    // Subtle brightness shift toward exposed edges; keep interior closer to edge tones to avoid square seams.
+                    int exposedCardinal = Integer.bitCount(mask & 0b1111);
+                    int exposedDiagonal = Integer.bitCount(mask >> 4);
+                    float shade = 0.42f
+                            + 0.035f * exposedCardinal
+                            + 0.040f * exposedDiagonal;
+                    shade = Math.min(shade, 0.58f);
                     blockColor.mul(shade, shade, shade, 1f);
                     spriteBatch.setColor(blockColor);
                     spriteBatch.draw(blockRegion, wx, wy, tileSize, tileSize);

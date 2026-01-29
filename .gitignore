@@ -5,6 +5,7 @@
 bin/
 **/*.class
 .metals/
+scripts/
 
 # IntelliJ / IDEA
 .idea/
