@@ -13,6 +13,7 @@ import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.WeaponSystem;
+import com.droiddungeon.systems.MiningSystem;
 
 /**
  * Builds GameContext instances for initial run and restarts.
@@ -62,6 +63,7 @@ public final class GameContextFactory {
         PlayerStats playerStats = new PlayerStats(100f);
         CompanionSystem companionSystem = new CompanionSystem(EntityIds.next(), player.getGridX(), player.getGridY(), config.companionDelayTiles(), config.companionSpeedTilesPerSecond(), entityWorld);
         WeaponSystem weaponSystem = setupWeapons();
+        MiningSystem miningSystem = new MiningSystem(grid, inventorySystem, itemRegistry);
         entityWorld.add(player);
         entityWorld.add(companionSystem);
 
@@ -75,7 +77,8 @@ public final class GameContextFactory {
                 inventory,
                 inventorySystem,
                 itemRegistry,
-                weaponSystem
+                weaponSystem,
+                miningSystem
         );
     }
 

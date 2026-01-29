@@ -70,6 +70,18 @@ public final class GameUpdater {
                     input.pointerOnUi()
             );
 
+            if (input.mineRequested()
+                    && !ctx.inventorySystem().isInventoryOpen()
+                    && !mapOpen
+                    && !input.pointerOnUi()) {
+                ctx.miningSystem().tryMine(
+                        ctx.player(),
+                        ctx.inventorySystem().getEquippedStack(),
+                        mouseWorld,
+                        worldViewportTileSize
+                );
+            }
+
             ctx.enemySystem().update(delta, ctx.player(), ctx.playerStats(), weaponState);
         } else {
             cameraController.update(ctx.grid(), ctx.player(), delta);

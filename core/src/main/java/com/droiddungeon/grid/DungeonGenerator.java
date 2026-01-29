@@ -82,11 +82,15 @@ public final class DungeonGenerator {
      * Raw per-tile data stored inside chunks.
      */
     public static final class TileCell {
-        public TileMaterial material;
+        public TileMaterial floor;
+        public BlockMaterial block;
+        public float blockHealth;
         public RoomType roomType;
 
-        public TileCell(TileMaterial material, RoomType roomType) {
-            this.material = material;
+        public TileCell(TileMaterial floor, BlockMaterial block, RoomType roomType) {
+            this.floor = floor;
+            this.block = block;
+            this.blockHealth = block != null ? block.maxHealth() : 0f;
             this.roomType = roomType;
         }
     }
@@ -115,7 +119,7 @@ public final class DungeonGenerator {
             int localX = worldX - originX;
             int localY = worldY - originY;
             if (localX < 0 || localX >= cells.length || localY < 0 || localY >= cells[0].length) {
-                return new TileCell(TileMaterial.VOID, null);
+                return new TileCell(TileMaterial.VOID, null, null);
             }
             return cells[localX][localY];
         }
@@ -169,7 +173,8 @@ public final class DungeonGenerator {
             TileCell[][] cells = new TileCell[chunkSize][chunkSize];
             for (int x = 0; x < chunkSize; x++) {
                 for (int y = 0; y < chunkSize; y++) {
-                    cells[x][y] = new TileCell(TileMaterial.VOID, null);
+                    // Default: solid stone block sitting on stone floor.
+                    cells[x][y] = new TileCell(TileMaterial.STONE, BlockMaterial.STONE, null);
                 }
             }
 
@@ -271,7 +276,9 @@ public final class DungeonGenerator {
                         if (lx < 0 || lx >= chunkSize || ly < 0 || ly >= chunkSize) {
                             continue;
                         }
-                        cells[lx][ly].material = TileMaterial.STONE;
+                        cells[lx][ly].block = null; // carve space
+                        cells[lx][ly].blockHealth = 0f;
+                        cells[lx][ly].floor = TileMaterial.STONE;
                         cells[lx][ly].roomType = room.type;
                     }
                 }
@@ -377,7 +384,9 @@ public final class DungeonGenerator {
                 if (localY < 0 || localY >= chunkSize) {
                     continue;
                 }
-                cells[localX][localY].material = TileMaterial.STONE;
+                cells[localX][localY].block = null; // carve corridor air
+                cells[localX][localY].blockHealth = 0f;
+                cells[localX][localY].floor = TileMaterial.STONE;
                 // roomType left as-is for corridors; renderer tints by null -> default.
             }
         }

@@ -14,6 +14,7 @@ import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.grid.BlockMaterial;
 
 /**
  * Gameplay minimap shown in the HUD (not debug-only).
@@ -90,6 +91,12 @@ public final class MinimapRenderer {
                     Color base = grid.getTileMaterial(worldX, worldY).darkColor();
                     shapeRenderer.setColor(base);
                     shapeRenderer.rect(drawX, drawY, tile, tile);
+                    BlockMaterial block = grid.getBlockMaterial(worldX, worldY);
+                    if (block != null) {
+                        Color blockColor = block.floorMaterial().darkColor().cpy().mul(0.85f);
+                        shapeRenderer.setColor(blockColor);
+                        shapeRenderer.rect(drawX, drawY, tile, tile);
+                    }
                 }
             }
         }

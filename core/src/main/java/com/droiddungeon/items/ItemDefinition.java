@@ -1,6 +1,7 @@
 package com.droiddungeon.items;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.droiddungeon.items.ToolType;
 
 public record ItemDefinition(
         String id,
@@ -8,7 +9,8 @@ public record ItemDefinition(
         int maxStackSize,
         TextureRegion icon,
         boolean equippable,
-        int maxDurability
+        int maxDurability,
+        ToolType toolType
 ) {
     public ItemDefinition {
         if (id == null || id.isBlank()) {
@@ -25,6 +27,9 @@ public record ItemDefinition(
         }
         if (maxDurability < 0) {
             throw new IllegalArgumentException("maxDurability must be >= 0");
+        }
+        if (toolType == null) {
+            toolType = ToolType.NONE;
         }
     }
 }

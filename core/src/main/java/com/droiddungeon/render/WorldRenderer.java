@@ -19,6 +19,7 @@ import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
@@ -333,15 +334,20 @@ public final class WorldRenderer {
         shapeRenderer.begin(ShapeType.Filled);
         for (int y = visible.minTileY; y <= visible.maxTileY; y++) {
             for (int x = visible.minTileX; x <= visible.maxTileX; x++) {
-                TileMaterial material = grid.getTileMaterial(x, y);
+                TileMaterial floor = grid.getTileMaterial(x, y);
                 com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(x, y);
-                shapeRenderer.setColor(colorFor(material, roomType, x + y));
-                shapeRenderer.rect(
-                        x * tileSize,
-                        y * tileSize,
-                        tileSize,
-                        tileSize
-                );
+                shapeRenderer.setColor(colorFor(floor, roomType, x + y));
+                float wx = x * tileSize;
+                float wy = y * tileSize;
+                shapeRenderer.rect(wx, wy, tileSize, tileSize);
+
+                BlockMaterial block = grid.getBlockMaterial(x, y);
+                if (block != null) {
+                    // Darker overlay to imply volume.
+                    Color blockColor = colorFor(block.floorMaterial(), roomType, x + y).mul(0.9f);
+                    shapeRenderer.setColor(blockColor);
+                    shapeRenderer.rect(wx, wy, tileSize, tileSize);
+                }
             }
         }
         shapeRenderer.end();

@@ -74,7 +74,49 @@ public final class Grid {
     }
 
     public TileMaterial getTileMaterial(int x, int y) {
-        return cellAt(x, y).material;
+        return cellAt(x, y).floor;
+    }
+
+    public BlockMaterial getBlockMaterial(int x, int y) {
+        return cellAt(x, y).block;
+    }
+
+    public float getBlockHealth(int x, int y) {
+        return cellAt(x, y).blockHealth;
+    }
+
+    public boolean hasBlock(int x, int y) {
+        return getBlockMaterial(x, y) != null;
+    }
+
+    public boolean damageBlock(int x, int y, float amount) {
+        if (amount <= 0f) {
+            return false;
+        }
+        DungeonGenerator.TileCell cell = mutableCell(x, y);
+        if (cell.block == null) {
+            return false;
+        }
+        cell.blockHealth = Math.max(0f, cell.blockHealth - amount);
+        if (cell.blockHealth <= 0f) {
+            cell.block = null;
+            cell.blockHealth = 0f;
+            return true;
+        }
+        return false;
+    }
+
+    public void setBlock(int x, int y, BlockMaterial block) {
+        DungeonGenerator.TileCell cell = mutableCell(x, y);
+        cell.block = block;
+        cell.blockHealth = block != null ? block.maxHealth() : 0f;
+    }
+
+    private DungeonGenerator.TileCell mutableCell(int x, int y) {
+        int chunkX = Math.floorDiv(x, chunkGenerator.chunkSize());
+        int chunkY = Math.floorDiv(y, chunkGenerator.chunkSize());
+        DungeonGenerator.Chunk chunk = ensureChunk(chunkX, chunkY);
+        return chunk.cellAt(x, y);
     }
 
     public DungeonGenerator.RoomType getRoomType(int x, int y) {
@@ -82,7 +124,13 @@ public final class Grid {
     }
 
     public boolean isWalkable(int x, int y) {
-        return getTileMaterial(x, y).isWalkable();
+        DungeonGenerator.TileCell cell = cellAt(x, y);
+        return cell.floor.isWalkable() && cell.block == null;
+    }
+
+    public boolean isTransparent(int x, int y) {
+        DungeonGenerator.TileCell cell = cellAt(x, y);
+        return cell.block == null || cell.block.transparent();
     }
 
     /**

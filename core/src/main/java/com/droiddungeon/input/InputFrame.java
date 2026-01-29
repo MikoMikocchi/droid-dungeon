@@ -12,5 +12,6 @@ public record InputFrame(
         boolean pickUpRequested,
         boolean mapToggleRequested,
         boolean mapCloseRequested,
-        boolean restartRequested
+        boolean restartRequested,
+        boolean mineRequested
 ){}

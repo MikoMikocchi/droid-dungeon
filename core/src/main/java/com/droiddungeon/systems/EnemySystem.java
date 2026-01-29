@@ -327,7 +327,7 @@ public final class EnemySystem {
         int cx = x0;
         int cy = y0;
         while (true) {
-            if (!grid.isWalkable(cx, cy)) {
+            if (!grid.isTransparent(cx, cy)) {
                 return false;
             }
             if (cx == x1 && cy == y1) {
@@ -339,7 +339,7 @@ public final class EnemySystem {
                 cx += sx;
             }
             if (cx == x1 && cy == y1) {
-                if (!grid.isWalkable(cx, cy)) {
+                if (!grid.isTransparent(cx, cy)) {
                     return false;
                 }
                 break;

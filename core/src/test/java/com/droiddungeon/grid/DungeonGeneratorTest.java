@@ -12,6 +12,8 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import com.droiddungeon.grid.BlockMaterial;
+
 class DungeonGeneratorTest {
 
     @Test
@@ -24,7 +26,7 @@ class DungeonGeneratorTest {
         assertTile(cells, 10, 10, TileMaterial.STONE);
         assertTile(cells, 10, 11, TileMaterial.STONE);
         assertTile(cells, 10, 12, TileMaterial.STONE);
-        assertEquals(TileMaterial.VOID, cells[10][8].material);
+        assertNotNull(cells[10][8].block);
     }
 
     @Test
@@ -36,7 +38,7 @@ class DungeonGeneratorTest {
         assertTile(cells, 5, 4, TileMaterial.STONE);
         assertTile(cells, 5, 5, TileMaterial.STONE);
         assertTile(cells, 5, 6, TileMaterial.STONE);
-        assertEquals(TileMaterial.VOID, cells[5][3].material);
+        assertNotNull(cells[5][3].block);
     }
 
     @Test
@@ -105,7 +107,7 @@ class DungeonGeneratorTest {
         DungeonGenerator.TileCell[][] cells = new DungeonGenerator.TileCell[size][size];
         for (int x = 0; x < size; x++) {
             for (int y = 0; y < size; y++) {
-                cells[x][y] = new DungeonGenerator.TileCell(TileMaterial.VOID, null);
+                cells[x][y] = new DungeonGenerator.TileCell(TileMaterial.STONE, BlockMaterial.STONE, null);
             }
         }
         return cells;
@@ -121,7 +123,8 @@ class DungeonGeneratorTest {
     }
 
     private static void assertTile(DungeonGenerator.TileCell[][] cells, int x, int y, TileMaterial expected) {
-        assertEquals(expected, cells[x][y].material, "Unexpected tile at " + x + "," + y);
+        assertEquals(expected, cells[x][y].floor, "Unexpected floor at " + x + "," + y);
+        assertNull(cells[x][y].block, "Expected carved air at " + x + "," + y);
     }
 
     private static List<String> roomSignatures(List<DungeonGenerator.Room> rooms) {

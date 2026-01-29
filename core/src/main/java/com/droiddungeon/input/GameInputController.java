@@ -1,6 +1,7 @@
 package com.droiddungeon.input;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.ui.HudRenderer;
@@ -36,6 +37,7 @@ public final class GameInputController {
         boolean mapToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_MAP);
         boolean mapCloseRequested = bindings.isJustPressed(InputAction.CLOSE_MAP);
         boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
+        boolean mineRequested = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && !pointerOnUi;
 
         return new InputFrame(
                 slotUnderCursor,
@@ -46,7 +48,8 @@ public final class GameInputController {
                 pickUpRequested,
                 mapToggleRequested,
                 mapCloseRequested,
-                restartRequested
+                restartRequested,
+                mineRequested
         );
     }
 }
