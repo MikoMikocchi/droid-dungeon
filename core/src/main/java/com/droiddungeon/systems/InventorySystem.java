@@ -6,6 +6,8 @@ import java.util.List;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.droiddungeon.crafting.CraftingSystem;
+import com.droiddungeon.crafting.CraftingRecipes;
 import com.droiddungeon.entity.EntityIds;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
@@ -23,6 +25,8 @@ public final class InventorySystem {
     private final ItemRegistry itemRegistry;
     private final EntityWorld entityWorld;
     private final Grid grid;
+    private final CraftingSystem craftingSystem;
+    private int selectedRecipeIndex;
     private final List<GroundItem> groundItems = new ArrayList<>();
 
     private ItemStack cursorStack;
@@ -35,6 +39,8 @@ public final class InventorySystem {
         this.itemRegistry = itemRegistry;
         this.grid = grid;
         this.entityWorld = entityWorld;
+        this.craftingSystem = new CraftingSystem(inventory, itemRegistry, CraftingRecipes.basic());
+        this.selectedRecipeIndex = 0;
         this.cursorStack = null;
         this.inventoryOpen = false;
         this.selectedSlotIndex = 0;
@@ -263,6 +269,36 @@ public final class InventorySystem {
 
     public void forceCloseInventory() {
         inventoryOpen = false;
+    }
+
+    public CraftingSystem getCraftingSystem() {
+        return craftingSystem;
+    }
+
+    public void selectRecipe(int index) {
+        if (index < 0 || index >= craftingSystem.getRecipes().size()) {
+            return;
+        }
+        selectedRecipeIndex = index;
+    }
+
+    public int getSelectedRecipeIndex() {
+        int max = craftingSystem.getRecipes().size();
+        if (max == 0) {
+            return -1;
+        }
+        if (selectedRecipeIndex < 0 || selectedRecipeIndex >= max) {
+            selectedRecipeIndex = 0;
+        }
+        return selectedRecipeIndex;
+    }
+
+    public CraftingSystem.CraftResult craftSelectedRecipe() {
+        int index = getSelectedRecipeIndex();
+        CraftingSystem.CraftResult result = craftingSystem.craft(index);
+        // Crafted items may change what is equipped or selected, so recompute.
+        updateEquippedFromSelection();
+        return result;
     }
 
     public boolean isInventoryOpen() {

@@ -6,6 +6,10 @@ package com.droiddungeon.input;
 public record InputFrame(
         int slotUnderCursor,
         int hoveredSlot,
+        int hoveredRecipeIcon,
+        int recipeSelectClickIndex,
+        boolean craftButtonHovered,
+        boolean craftButtonClicked,
         boolean pointerOnUi,
         boolean slotClicked,
         boolean dropRequested,

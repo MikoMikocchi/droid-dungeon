@@ -145,10 +145,14 @@ public final class GameRenderCoordinator {
                 uiViewport,
                 ctx.inventory(),
                 ctx.itemRegistry(),
+                ctx.inventorySystem().getCraftingSystem(),
                 ctx.inventorySystem().getCursorStack(),
                 ctx.inventorySystem().isInventoryOpen(),
                 ctx.inventorySystem().getSelectedSlotIndex(),
                 input.hoveredSlot(),
+                input.hoveredRecipeIcon(),
+                ctx.inventorySystem().getSelectedRecipeIndex(),
+                input.craftButtonHovered(),
                 delta,
                 ctx.playerStats()
         );

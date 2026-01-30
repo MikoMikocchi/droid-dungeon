@@ -12,6 +12,8 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.crafting.CraftingRecipe;
+import com.droiddungeon.crafting.CraftingSystem;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
@@ -28,10 +30,28 @@ public final class HudRenderer {
     private final float cellSize = 48f;
     private final float gap = 6f;
     private final float padding = 10f;
+    private final float craftPanelGap = 26f;
+    private final float craftPanelWidthBase = 380f;
+    private final float craftIconSize = 44f;
+    private final float craftIconGap = 8f;
+    private final int craftIconsPerRow = 4;
+    private final float craftDetailHeight = 126f;
+    private final float craftDetailGap = 12f;
+    private final float craftPanelPadding = 12f;
+    private final float craftHeaderHeight = 24f;
+    private final float craftButtonWidth = 82f;
+    private final float craftButtonHeight = 32f;
 
     private float lastOriginX;
     private float lastOriginY;
     private int lastRows;
+    private float craftPanelX;
+    private float craftPanelY;
+    private float craftPanelWidth;
+    private float craftPanelHeight;
+    private boolean craftingVisible;
+    private int iconRows;
+    private int lastRecipeCount;
 
     private boolean tooltipVisible;
     private String tooltipText;
@@ -42,6 +62,12 @@ public final class HudRenderer {
     private float tooltipTextWidth;
     private float tooltipTextHeight;
 
+    public static record CraftingHit(int iconIndex, boolean insidePanel, boolean onCraftButton) {
+        public static CraftingHit none() {
+            return new CraftingHit(-1, false, false);
+        }
+    }
+
     public HudRenderer() {
         font = RenderAssets.font(14);
         whiteRegion = RenderAssets.whiteRegion();
@@ -51,10 +77,14 @@ public final class HudRenderer {
             Viewport viewport,
             Inventory inventory,
             ItemRegistry itemRegistry,
+            CraftingSystem craftingSystem,
             ItemStack cursorStack,
             boolean inventoryOpen,
             int selectedSlotIndex,
             int hoveredSlotIndex,
+            int hoveredRecipeIndex,
+            int selectedRecipeIndex,
+            boolean craftButtonHovered,
             float deltaSeconds,
             com.droiddungeon.player.PlayerStats playerStats
     ) {
@@ -62,33 +92,64 @@ public final class HudRenderer {
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
         spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
-        cacheLayout(viewport, inventoryOpen);
+        int recipeCount = craftingSystem != null ? craftingSystem.getRecipes().size() : 0;
+        cacheLayout(viewport, inventoryOpen, recipeCount);
 
         updateTooltipData(viewport, inventory, itemRegistry, hoveredSlotIndex);
 
-        renderShapes(viewport, inventory, inventoryOpen, selectedSlotIndex);
+        renderShapes(viewport, inventory, inventoryOpen, selectedSlotIndex, craftingSystem, hoveredRecipeIndex, selectedRecipeIndex, craftButtonHovered);
         renderHealth(viewport, playerStats);
 
         spriteBatch.begin();
+        renderCraftingContents(inventory, craftingSystem, itemRegistry, hoveredRecipeIndex, selectedRecipeIndex, craftButtonHovered);
         renderSlotContents(inventory, itemRegistry);
         renderTooltipText();
         renderCursorStack(viewport, itemRegistry, cursorStack);
         spriteBatch.end();
     }
 
-    private void cacheLayout(Viewport viewport, boolean inventoryOpen) {
+    private void cacheLayout(Viewport viewport, boolean inventoryOpen, int recipeCount) {
         float viewportWidth = viewport.getWorldWidth();
         float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
-        lastOriginX = (viewportWidth - hotbarWidth) * 0.5f;
-        lastOriginY = padding;
+
         lastRows = inventoryOpen ? 4 : 1;
+        lastOriginY = padding;
+        lastRecipeCount = Math.max(0, recipeCount);
+
+        if (!inventoryOpen) {
+            lastOriginX = (viewportWidth - hotbarWidth) * 0.5f;
+            craftingVisible = false;
+            craftPanelHeight = 0f;
+            craftPanelWidth = 0f;
+            return;
+        }
+
+        float gridWidth = hotbarWidth;
+        float gridHeight = lastRows * cellSize + (lastRows - 1) * gap;
+
+        iconRows = Math.max(1, (int) Math.ceil(lastRecipeCount / (float) craftIconsPerRow));
+        float iconsHeight = iconRows * (craftIconSize + craftIconGap) - craftIconGap;
+        float bodyHeight = iconsHeight + craftDetailGap + craftDetailHeight;
+
+        craftPanelHeight = Math.max(craftHeaderHeight + craftPanelPadding * 2f + bodyHeight, gridHeight + 30f);
+        craftPanelWidth = craftPanelWidthBase;
+
+        float totalWidth = gridWidth + craftPanelGap + craftPanelWidth;
+        lastOriginX = (viewportWidth - totalWidth) * 0.5f;
+        craftPanelX = lastOriginX + gridWidth + craftPanelGap;
+        craftPanelY = lastOriginY;
+        craftingVisible = true;
     }
 
     private void renderShapes(
             Viewport viewport,
             Inventory inventory,
             boolean inventoryOpen,
-            int selectedSlotIndex
+            int selectedSlotIndex,
+            CraftingSystem craftingSystem,
+            int hoveredRecipeIndex,
+            int selectedRecipeIndex,
+            boolean craftButtonHovered
     ) {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -97,12 +158,14 @@ public final class HudRenderer {
         if (inventoryOpen) {
             renderInventoryBackdropFilled(viewport.getWorldWidth(), viewport.getWorldHeight());
         }
+        renderCraftingPanelFilled(craftingSystem, hoveredRecipeIndex, selectedRecipeIndex, craftButtonHovered);
         renderSlotGridFilled(inventory, selectedSlotIndex);
         renderTooltipBoxFilled();
         shapeRenderer.end();
 
         shapeRenderer.begin(ShapeType.Line);
         renderSlotGridOutline();
+        renderCraftingOutline();
         shapeRenderer.end();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -111,6 +174,48 @@ public final class HudRenderer {
     private void renderInventoryBackdropFilled(float viewportWidth, float viewportHeight) {
         shapeRenderer.setColor(0.05f, 0.05f, 0.06f, 0.3f);
         shapeRenderer.rect(0f, 0f, viewportWidth, viewportHeight);
+    }
+
+    private void renderCraftingPanelFilled(CraftingSystem craftingSystem, int hoveredRecipeIndex, int selectedRecipeIndex, boolean craftButtonHovered) {
+        if (!craftingVisible || craftingSystem == null) {
+            return;
+        }
+
+        shapeRenderer.setColor(0.07f, 0.07f, 0.09f, 0.92f);
+        shapeRenderer.rect(craftPanelX, craftPanelY, craftPanelWidth, craftPanelHeight);
+
+        float headerY = craftPanelY + craftPanelHeight - craftHeaderHeight - craftPanelPadding * 0.35f;
+        shapeRenderer.setColor(0.13f, 0.13f, 0.16f, 1f);
+        shapeRenderer.rect(craftPanelX, headerY, craftPanelWidth, craftHeaderHeight + craftPanelPadding * 0.35f);
+
+        // Icons background
+        for (int i = 0; i < craftingSystem.getRecipes().size(); i++) {
+            boolean hovered = hoveredRecipeIndex == i;
+            boolean selected = selectedRecipeIndex == i;
+            boolean canCraft = craftingSystem.canCraft(i);
+
+            Color base = canCraft ? new Color(0.12f, 0.18f, 0.14f, 0.95f) : new Color(0.12f, 0.12f, 0.14f, 0.9f);
+            if (selected) {
+                base = new Color(base.r + 0.06f, base.g + 0.06f, base.b + 0.08f, 1f);
+            } else if (hovered) {
+                base = new Color(base.r + 0.04f, base.g + 0.04f, base.b + 0.04f, 1f);
+            }
+            shapeRenderer.setColor(base);
+            shapeRenderer.rect(iconX(i), iconY(i), craftIconSize, craftIconSize);
+        }
+
+        // Detail box
+        float detailY = detailY();
+        shapeRenderer.setColor(0.11f, 0.11f, 0.14f, 0.96f);
+        shapeRenderer.rect(craftPanelX + craftPanelPadding, detailY, craftPanelWidth - craftPanelPadding * 2f, craftDetailHeight);
+
+        // Craft button background (for hover pulse)
+        float btnX = detailButtonX();
+        float btnY = detailButtonY();
+        if (craftButtonHovered) {
+            shapeRenderer.setColor(0.34f, 0.82f, 0.45f, 0.12f);
+            shapeRenderer.rect(btnX - 4f, btnY - 4f, craftButtonWidth + 8f, craftButtonHeight + 8f);
+        }
     }
 
     private void renderSlotGridFilled(Inventory inventory, int selectedSlotIndex) {
@@ -162,6 +267,221 @@ public final class HudRenderer {
                 shapeRenderer.rect(x, y, cellSize, cellSize);
             }
         }
+    }
+
+    private void renderCraftingOutline() {
+        if (!craftingVisible) {
+            return;
+        }
+        shapeRenderer.setColor(0.28f, 0.28f, 0.33f, 1f);
+        shapeRenderer.rect(craftPanelX, craftPanelY, craftPanelWidth, craftPanelHeight);
+    }
+
+    private float iconsAreaHeight() {
+        return iconRows * (craftIconSize + craftIconGap) - craftIconGap;
+    }
+
+    private float iconsTopY() {
+        float headerBottom = craftPanelY + craftPanelHeight - craftHeaderHeight - craftPanelPadding * 0.35f;
+        return headerBottom - craftIconSize - craftPanelPadding * 0.5f;
+    }
+
+    private float iconX(int recipeIndex) {
+        int col = recipeIndex % craftIconsPerRow;
+        return craftPanelX + craftPanelPadding + col * (craftIconSize + craftIconGap);
+    }
+
+    private float iconY(int recipeIndex) {
+        int row = recipeIndex / craftIconsPerRow;
+        return iconsTopY() - row * (craftIconSize + craftIconGap);
+    }
+
+    private float detailY() {
+        return craftPanelY + craftPanelPadding;
+    }
+
+    private float detailHeight() {
+        return craftDetailHeight;
+    }
+
+    private float detailWidth() {
+        return craftPanelWidth - craftPanelPadding * 2f;
+    }
+
+    private float detailButtonX() {
+        return craftPanelX + craftPanelPadding + detailWidth() - craftButtonWidth;
+    }
+
+    private float detailButtonY() {
+        return detailY() + 10f;
+    }
+
+    private void renderCraftingContents(
+            Inventory inventory,
+            CraftingSystem craftingSystem,
+            ItemRegistry itemRegistry,
+            int hoveredRecipeIndex,
+            int selectedRecipeIndex,
+            boolean craftButtonHovered
+    ) {
+        if (!craftingVisible || craftingSystem == null) {
+            return;
+        }
+
+        font.setColor(Color.WHITE);
+        glyphLayout.setText(font, "Crafting");
+        float titleX = craftPanelX + craftPanelPadding;
+        float titleY = craftPanelY + craftPanelHeight - craftPanelPadding * 0.5f;
+        font.draw(spriteBatch, glyphLayout, titleX, titleY);
+
+        glyphLayout.setText(font, "Choose an item to see recipe");
+        font.setColor(new Color(0.82f, 0.84f, 0.9f, 0.8f));
+        font.draw(spriteBatch, glyphLayout, titleX, titleY - glyphLayout.height - 2f);
+        font.setColor(Color.WHITE);
+
+        // Icons
+        for (int i = 0; i < craftingSystem.getRecipes().size(); i++) {
+            CraftingRecipe recipe = craftingSystem.getRecipes().get(i);
+            ItemDefinition def = itemRegistry.get(recipe.resultItemId());
+            TextureRegion icon = def != null ? def.icon() : null;
+            if (icon != null) {
+                spriteBatch.draw(icon, iconX(i) + 4f, iconY(i) + 4f, craftIconSize - 8f, craftIconSize - 8f);
+            }
+            boolean canCraft = craftingSystem.canCraft(i);
+            if (!canCraft) {
+                spriteBatch.setColor(0f, 0f, 0f, 0.4f);
+                spriteBatch.draw(whiteRegion, iconX(i), iconY(i), craftIconSize, craftIconSize);
+                spriteBatch.setColor(Color.WHITE);
+            }
+
+            // Selection ring
+            if (selectedRecipeIndex == i) {
+                spriteBatch.setColor(1f, 0.84f, 0.35f, 0.9f);
+                spriteBatch.draw(whiteRegion, iconX(i) - 2f, iconY(i) - 2f, craftIconSize + 4f, 3f);
+                spriteBatch.draw(whiteRegion, iconX(i) - 2f, iconY(i) + craftIconSize - 1f, craftIconSize + 4f, 3f);
+                spriteBatch.draw(whiteRegion, iconX(i) - 2f, iconY(i) - 2f, 3f, craftIconSize + 4f);
+                spriteBatch.draw(whiteRegion, iconX(i) + craftIconSize - 1f, iconY(i) - 2f, 3f, craftIconSize + 4f);
+                spriteBatch.setColor(Color.WHITE);
+            } else if (hoveredRecipeIndex == i) {
+                spriteBatch.setColor(1f, 1f, 1f, 0.18f);
+                spriteBatch.draw(whiteRegion, iconX(i) - 2f, iconY(i) - 2f, craftIconSize + 4f, craftIconSize + 4f);
+                spriteBatch.setColor(Color.WHITE);
+            }
+        }
+
+        // Detail area
+        int detailIndex = selectedRecipeIndex >= 0 && selectedRecipeIndex < craftingSystem.getRecipes().size()
+                ? selectedRecipeIndex
+                : (craftingSystem.getRecipes().isEmpty() ? -1 : 0);
+        if (detailIndex == -1) {
+            return;
+        }
+        CraftingRecipe recipe = craftingSystem.getRecipes().get(detailIndex);
+        boolean hasIngredients = craftingSystem.hasAllIngredients(recipe);
+        boolean canCraft = craftingSystem.canCraft(detailIndex);
+        boolean blockedBySpace = hasIngredients && !canCraft;
+
+        float detailX = craftPanelX + craftPanelPadding + 10f;
+        float detailTop = detailY() + craftDetailHeight - 12f;
+
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, recipe.displayName(), detailX, detailTop);
+        font.setColor(new Color(0.82f, 0.84f, 0.9f, 0.8f));
+        glyphLayout.setText(font, "Ingredients");
+        font.draw(spriteBatch, glyphLayout, detailX, detailTop - glyphLayout.height - 4f);
+        font.setColor(Color.WHITE);
+
+        float ingSize = 36f;
+        float ingGap = 12f;
+        float ingX = detailX;
+        float ingY = detailY() + 22f;
+        for (var ingredient : recipe.ingredients()) {
+            ItemDefinition def = itemRegistry.get(ingredient.itemId());
+            TextureRegion icon = def != null ? def.icon() : null;
+            int owned = countInInventory(inventory, ingredient.itemId());
+            boolean enough = owned >= ingredient.count();
+
+            if (icon != null) {
+                if (!enough) {
+                    spriteBatch.setColor(1f, 0.6f, 0.55f, 1f);
+                }
+                spriteBatch.draw(icon, ingX, ingY, ingSize, ingSize);
+                spriteBatch.setColor(Color.WHITE);
+            }
+            String needText = owned + "/" + ingredient.count();
+            glyphLayout.setText(font, needText);
+            font.setColor(enough ? new Color(0.82f, 0.86f, 0.9f, 0.95f) : new Color(1f, 0.65f, 0.65f, 1f));
+            font.draw(spriteBatch, needText, ingX, ingY - 4f);
+            font.setColor(Color.WHITE);
+
+            ingX += ingSize + ingGap;
+        }
+
+        // Arrow and result
+        float resultSize = 44f;
+        float arrowX = detailButtonX() - resultSize - 26f;
+        float arrowY = detailY() + craftDetailHeight * 0.5f + glyphLayout.height * 0.2f;
+        glyphLayout.setText(font, "→");
+        font.setColor(new Color(0.9f, 0.9f, 0.95f, 1f));
+        font.draw(spriteBatch, glyphLayout, arrowX, arrowY);
+        font.setColor(Color.WHITE);
+
+        ItemDefinition resultDef = itemRegistry.get(recipe.resultItemId());
+        TextureRegion resultIcon = resultDef != null ? resultDef.icon() : null;
+        float resultX = detailButtonX() - resultSize - glyphLayout.width - 12f;
+        float resultY = detailY() + (craftDetailHeight - resultSize) * 0.55f;
+        if (resultIcon != null) {
+            spriteBatch.draw(resultIcon, resultX, resultY, resultSize, resultSize);
+        }
+        if (recipe.resultCount() > 1) {
+            String countText = Integer.toString(recipe.resultCount());
+            glyphLayout.setText(font, countText);
+            float textX = resultX + resultSize - glyphLayout.width + 2f;
+            float textY = resultY + glyphLayout.height + 2f;
+            drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
+        }
+
+        // Craft button
+        Color buttonColor;
+        if (canCraft) {
+            buttonColor = craftButtonHovered ? new Color(0.34f, 0.82f, 0.45f, 1f) : new Color(0.25f, 0.72f, 0.38f, 0.95f);
+        } else if (blockedBySpace) {
+            buttonColor = new Color(0.95f, 0.62f, 0.26f, 0.92f);
+        } else {
+            buttonColor = new Color(0.35f, 0.37f, 0.4f, 0.9f);
+        }
+        spriteBatch.setColor(buttonColor);
+        float btnX = detailButtonX();
+        float btnY = detailButtonY();
+        spriteBatch.draw(whiteRegion, btnX, btnY, craftButtonWidth, craftButtonHeight);
+        spriteBatch.setColor(1f, 1f, 1f, 0.2f);
+        spriteBatch.draw(whiteRegion, btnX, btnY + craftButtonHeight - 3f, craftButtonWidth, 3f);
+        spriteBatch.setColor(Color.WHITE);
+
+        String buttonText;
+        if (canCraft) {
+            buttonText = "Craft";
+        } else if (blockedBySpace) {
+            buttonText = "No space";
+        } else {
+            buttonText = "Missing";
+        }
+        glyphLayout.setText(font, buttonText);
+        float textX = btnX + (craftButtonWidth - glyphLayout.width) * 0.5f;
+        float textY = btnY + (craftButtonHeight + glyphLayout.height) * 0.5f;
+        font.setColor(Color.WHITE);
+        font.draw(spriteBatch, glyphLayout, textX, textY);
+    }
+
+    private int countInInventory(Inventory inventory, String itemId) {
+        int total = 0;
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack stack = inventory.get(i);
+            if (stack != null && stack.itemId().equals(itemId)) {
+                total += stack.count();
+            }
+        }
+        return total;
     }
 
     private void renderSlotContents(Inventory inventory, ItemRegistry itemRegistry) {
@@ -391,8 +711,8 @@ public final class HudRenderer {
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
-    public int hitTestSlot(Viewport viewport, float screenX, float screenY, boolean inventoryOpen) {
-        cacheLayout(viewport, inventoryOpen);
+    public int hitTestSlot(Viewport viewport, float screenX, float screenY, boolean inventoryOpen, int recipeCount) {
+        cacheLayout(viewport, inventoryOpen, recipeCount);
         Vector2 world = new Vector2(screenX, screenY);
         viewport.unproject(world);
 
@@ -406,6 +726,42 @@ public final class HudRenderer {
             }
         }
         return -1;
+    }
+
+    public CraftingHit hitTestCrafting(Viewport viewport, float screenX, float screenY, boolean inventoryOpen, int recipeCount) {
+        cacheLayout(viewport, inventoryOpen, recipeCount);
+        if (!craftingVisible) {
+            return CraftingHit.none();
+        }
+        Vector2 world = new Vector2(screenX, screenY);
+        viewport.unproject(world);
+
+        boolean insidePanel = world.x >= craftPanelX && world.x <= craftPanelX + craftPanelWidth
+                && world.y >= craftPanelY && world.y <= craftPanelY + craftPanelHeight;
+        if (!insidePanel) {
+            return CraftingHit.none();
+        }
+
+        int iconIndex = -1;
+        for (int i = 0; i < recipeCount; i++) {
+            float x = iconX(i);
+            float y = iconY(i);
+            if (world.x >= x && world.x <= x + craftIconSize &&
+                    world.y >= y && world.y <= y + craftIconSize) {
+                iconIndex = i;
+                break;
+            }
+        }
+
+        boolean onButton = false;
+        float btnX = detailButtonX();
+        float btnY = detailButtonY();
+        if (world.x >= btnX && world.x <= btnX + craftButtonWidth &&
+                world.y >= btnY && world.y <= btnY + craftButtonHeight) {
+            onButton = true;
+        }
+
+        return new CraftingHit(iconIndex, true, onButton);
     }
 
     public void dispose() {

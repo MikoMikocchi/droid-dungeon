@@ -46,6 +46,12 @@ public final class GameUpdater {
             if (input.slotClicked()) {
                 ctx.inventorySystem().onSlotClicked(input.slotUnderCursor());
             }
+            if (input.recipeSelectClickIndex() != -1) {
+                ctx.inventorySystem().selectRecipe(input.recipeSelectClickIndex());
+            }
+            if (input.craftButtonClicked()) {
+                ctx.inventorySystem().craftSelectedRecipe();
+            }
 
             if (!ctx.inventorySystem().isInventoryOpen() && !mapOpen) {
                 movementController.update(ctx.grid(), ctx.player(), ctx.entityWorld());
