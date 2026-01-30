@@ -519,6 +519,17 @@ public final class HudRenderer {
                 float textX = drawX + drawSize - glyphLayout.width + 2f;
                 float textY = drawY + glyphLayout.height + 2f;
                 drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
+
+                int maxDurability = def.maxDurability();
+                if (maxDurability > 0) {
+                    float ratio = Math.max(0f, Math.min(1f, stack.durability() / (float) maxDurability));
+                    float barPad = 6f;
+                    float barHeight = 5f;
+                    float barWidth = cellSize - barPad * 2f;
+                    float barX = lastOriginX + col * (cellSize + gap) + barPad;
+                    float barY = rowY(row) + 4f;
+                    drawDurabilityBar(spriteBatch, barX, barY, barWidth, barHeight, ratio);
+                }
             }
         }
     }
@@ -635,6 +646,19 @@ public final class HudRenderer {
 
         font.setColor(Color.WHITE);
         font.draw(batch, text, Math.round(x), Math.round(y));
+    }
+
+    private void drawDurabilityBar(SpriteBatch batch, float x, float y, float width, float height, float ratio) {
+        // Background
+        batch.setColor(0f, 0f, 0f, 0.65f);
+        batch.draw(whiteRegion, x, y, width, height);
+        // Fill
+        float r = 0.9f - 0.7f * ratio;   // red to green
+        float g = 0.25f + 0.55f * ratio;
+        float b = 0.2f + 0.2f * ratio;
+        batch.setColor(r, g, b, 1f);
+        batch.draw(whiteRegion, x, y, width * ratio, height);
+        batch.setColor(Color.WHITE);
     }
 
     private void renderHealth(Viewport viewport, com.droiddungeon.player.PlayerStats stats) {

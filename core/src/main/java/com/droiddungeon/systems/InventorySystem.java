@@ -320,6 +320,34 @@ public final class InventorySystem {
         return inventory.get(equippedSlotIndex);
     }
 
+    /**
+     * Decrease durability of the currently equipped item (if any) and remove it when it breaks.
+     */
+    public void damageEquippedItem(int amount) {
+        if (amount <= 0 || equippedSlotIndex < 0 || equippedSlotIndex >= Inventory.TOTAL_SLOTS) {
+            return;
+        }
+        ItemStack stack = inventory.get(equippedSlotIndex);
+        if (stack == null) {
+            updateEquippedFromSelection();
+            return;
+        }
+        int maxDurability = itemRegistry.maxDurability(stack.itemId());
+        if (maxDurability <= 0) {
+            return; // Item has no durability; ignore.
+        }
+        int newDurability = Math.max(0, stack.durability() - amount);
+        if (newDurability == stack.durability()) {
+            return;
+        }
+        if (newDurability <= 0) {
+            inventory.set(equippedSlotIndex, null); // tool broke
+        } else {
+            inventory.set(equippedSlotIndex, stack.withDurability(newDurability));
+        }
+        updateEquippedFromSelection();
+    }
+
     public ItemStack getCursorStack() {
         return cursorStack;
     }

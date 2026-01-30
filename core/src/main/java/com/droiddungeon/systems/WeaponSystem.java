@@ -62,6 +62,9 @@ public final class WeaponSystem {
     private int swingIndex;
     private WeaponState cachedState = WeaponState.inactive();
 
+    public WeaponSystem() {
+    }
+
     public void register(String itemId, WeaponSpec spec) {
         if (itemId == null || itemId.isBlank() || spec == null) {
             return;

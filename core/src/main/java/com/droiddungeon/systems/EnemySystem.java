@@ -17,6 +17,7 @@ import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.player.PlayerStats;
+import com.droiddungeon.systems.InventorySystem;
 
 /**
  * Spawns and updates hostile entities.
@@ -25,14 +26,16 @@ public final class EnemySystem {
     private final Grid grid;
     private final long worldSeed;
     private final EntityWorld entityWorld;
+    private final InventorySystem inventorySystem;
     private final List<Enemy> enemies = new ArrayList<>();
     private final Set<String> spawnedRooms = new HashSet<>();
     private final Random ambientRng;
 
-    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld) {
+    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, InventorySystem inventorySystem) {
         this.grid = grid;
         this.worldSeed = worldSeed;
         this.entityWorld = entityWorld;
+        this.inventorySystem = inventorySystem;
         this.ambientRng = new Random(worldSeed ^ 0xACEDBADEL);
     }
 
@@ -274,10 +277,14 @@ public final class EnemySystem {
             if (Math.abs(delta) > weaponState.arcRad() * 0.5f) {
                 continue;
             }
+            boolean damaged = false;
             if (entity instanceof Enemy enemy) {
-                enemy.applyDamage(weaponState.damage(), weaponState.swingIndex());
+                damaged = enemy.applyDamage(weaponState.damage(), weaponState.swingIndex());
             } else {
-                damageable.applyDamage(weaponState.damage());
+                damaged = damageable.applyDamage(weaponState.damage());
+            }
+            if (damaged && inventorySystem != null) {
+                inventorySystem.damageEquippedItem(1);
             }
         }
     }

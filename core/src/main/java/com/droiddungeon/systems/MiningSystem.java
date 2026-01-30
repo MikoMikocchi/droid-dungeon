@@ -104,6 +104,9 @@ public final class MiningSystem {
                 inventorySystem.addGroundStack(targetX, targetY,
                         new ItemStack(block.dropItemId(), block.dropCount()));
             }
+            if (destroyed && equippedItem != null) {
+                inventorySystem.damageEquippedItem(1);
+            }
             resetProgress(); // completed; require re-aim to restart
         }
     }

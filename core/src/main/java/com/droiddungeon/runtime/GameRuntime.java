@@ -95,7 +95,7 @@ public final class GameRuntime {
         inventory = new Inventory();
         itemRegistry = ItemRegistry.load("items.txt");
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
-        enemySystem = new EnemySystem(grid, worldSeed, entityWorld);
+        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, inventorySystem);
         contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
