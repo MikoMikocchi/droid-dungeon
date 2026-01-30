@@ -10,11 +10,11 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.enemies.Enemy;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.DungeonGenerator.Room;
 import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
-import com.droiddungeon.grid.BlockMaterial;
 
 /**
  * Gameplay minimap shown in the HUD (not debug-only).
