@@ -27,6 +27,9 @@ public final class GameRenderCoordinator {
     private LightingSystem lightingSystem;
     private boolean lightingEnabled = true;
 
+    // Debug overlay visibility (toggled with F3)
+    private boolean debugVisible = true;
+
     public GameRenderCoordinator() {
         worldRenderer = new WorldRenderer();
         hudRenderer = new HudRenderer();
@@ -112,18 +115,30 @@ public final class GameRenderCoordinator {
         // Post-process style screen effects should sit between world and UI so the HUD stays crisp.
         screenEffectRenderer.render(uiViewport, delta);
 
-        String debugText = debugTextBuilder.build(
-                worldViewport,
-                ctx.grid(),
-                ctx.player(),
-                ctx.companionSystem(),
-                ctx.enemySystem(),
-                ctx.inventorySystem(),
-                ctx.itemRegistry(),
-                ctx.playerStats(),
-                update.gridOriginX(),
-                update.gridOriginY()
-        );
+        int lightCount = (lightingSystem != null && lightingEnabled) ? lightingSystem.getRenderer().getLights().size() : 0;
+
+        // Toggle debug overlay visibility on F3
+        if (input.debugToggleRequested()) {
+            debugVisible = !debugVisible;
+        }
+
+        String debugText = null;
+        if (debugVisible) {
+            debugText = debugTextBuilder.build(
+                    worldViewport,
+                    ctx.grid(),
+                    ctx.player(),
+                    ctx.companionSystem(),
+                    ctx.enemySystem(),
+                    ctx.inventorySystem(),
+                    ctx.itemRegistry(),
+                    ctx.playerStats(),
+                    update.gridOriginX(),
+                    update.gridOriginY(),
+                    delta,
+                    lightCount
+            );
+        }
 
         hudRenderer.render(
                 uiViewport,
@@ -136,6 +151,7 @@ public final class GameRenderCoordinator {
                 delta,
                 ctx.playerStats()
         );
+
         // keep minimap fog in sync even when full map is closed
         mapOverlay.revealAround(ctx.player(), 10);
         minimapRenderer.render(

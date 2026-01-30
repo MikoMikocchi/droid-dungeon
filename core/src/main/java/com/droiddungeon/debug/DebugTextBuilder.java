@@ -30,7 +30,9 @@ public final class DebugTextBuilder {
             ItemRegistry itemRegistry,
             PlayerStats playerStats,
             float gridOriginX,
-            float gridOriginY
+            float gridOriginY,
+            float delta,
+            int lightCount
     ) {
         float tileSize = grid.getTileSize();
         Vector2 world = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
@@ -40,7 +42,23 @@ public final class DebugTextBuilder {
         int tileX = (int) Math.floor(localX / tileSize);
         int tileY = (int) Math.floor(localY / tileSize);
 
+        // Performance info
+        int fps = com.badlogic.gdx.Gdx.graphics.getFramesPerSecond();
+        float ms = delta * 1000f;
+        Runtime rt = Runtime.getRuntime();
+        long usedMb = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
+        long maxMb = rt.maxMemory() / (1024 * 1024);
+        int totalEnemies = enemySystem != null ? enemySystem.getEnemies().size() : 0;
+        int groundItemCount = inventorySystem != null ? inventorySystem.getGroundItems().size() : 0;
+
         StringBuilder text = new StringBuilder();
+        text.append("FPS: ").append(fps).append(" (").append(String.format("%.1fms", ms)).append(")");
+        text.append("  |  Mem: ").append(usedMb).append("/").append(maxMb).append("MB");
+        text.append("  |  Lights: ").append(lightCount);
+        text.append("  |  Enemies: ").append(totalEnemies);
+        text.append("  |  Items: ").append(groundItemCount);
+        text.append("\n\n");
+
         if (grid.isInside(tileX, tileY)) {
             appendTileInfo(grid, player, companionSystem, enemySystem, inventorySystem, itemRegistry, tileX, tileY, text);
         } else {

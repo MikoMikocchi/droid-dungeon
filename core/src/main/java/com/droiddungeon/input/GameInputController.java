@@ -38,6 +38,7 @@ public final class GameInputController {
         boolean mapCloseRequested = bindings.isJustPressed(InputAction.CLOSE_MAP);
         boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
         boolean mineRequested = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && !pointerOnUi;
+        boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
 
         return new InputFrame(
                 slotUnderCursor,
@@ -49,7 +50,8 @@ public final class GameInputController {
                 mapToggleRequested,
                 mapCloseRequested,
                 restartRequested,
-                mineRequested
+                mineRequested,
+                debugToggleRequested
         );
     }
 }

@@ -9,5 +9,6 @@ public enum InputAction {
     PICK_UP_ITEM,
     TOGGLE_MAP,
     CLOSE_MAP,
-    RESTART_RUN
+    RESTART_RUN,
+    TOGGLE_DEBUG
 }

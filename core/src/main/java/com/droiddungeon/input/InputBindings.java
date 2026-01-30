@@ -23,6 +23,8 @@ public final class InputBindings {
         bindings.map(InputAction.TOGGLE_MAP, Input.Keys.M);
         bindings.map(InputAction.CLOSE_MAP, Input.Keys.ESCAPE);
         bindings.map(InputAction.RESTART_RUN, Input.Keys.R);
+        // Toggle debug overlay with F3
+        bindings.map(InputAction.TOGGLE_DEBUG, Input.Keys.F3);
         return bindings;
     }
 
