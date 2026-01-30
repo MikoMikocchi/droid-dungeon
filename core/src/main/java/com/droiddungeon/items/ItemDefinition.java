@@ -1,7 +1,6 @@
 package com.droiddungeon.items;
 
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.droiddungeon.items.ToolType;
 
 public record ItemDefinition(
         String id,

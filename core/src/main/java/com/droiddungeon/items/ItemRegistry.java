@@ -13,7 +13,6 @@ import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStackSizer;
-import com.droiddungeon.items.ToolType;
 
 public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     private final Map<String, ItemDefinition> definitions = new HashMap<>();

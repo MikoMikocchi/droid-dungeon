@@ -35,12 +35,6 @@ public final class LightingAssets implements Disposable {
     public static final String DITHER = "dither";
     public static final String SOFT_EDGE_64 = "soft_edge_64";
     public static final String SOFT_EDGE_128 = "soft_edge_128";
-    public static final String TORCH_1 = "torch_1";
-    public static final String TORCH_2 = "torch_2";
-    public static final String TORCH_3 = "torch_3";
-    public static final String CAMPFIRE = "campfire";
-    public static final String LANTERN = "lantern";
-    public static final String CANDLE = "candle";
     public static final String SHADOW_PENUMBRA = "shadow_penumbra";
 
     private static final String BASE_PATH = "textures/lighting/";
@@ -136,15 +130,11 @@ public final class LightingAssets implements Disposable {
      * Preload commonly used textures.
      */
     public void preload() {
-            getTexture(GRADIENT_SOFT_256);
+        getTexture(GRADIENT_SOFT_256);
         getTexture(GRADIENT_MEDIUM_256);
         getTexture(GRADIENT_WHITE);
 
         getTexture(NOISE_A);
-
-        getTexture(TORCH_1);
-        getTexture(LANTERN);
-        getTexture(CAMPFIRE);
     }
 
     /**
