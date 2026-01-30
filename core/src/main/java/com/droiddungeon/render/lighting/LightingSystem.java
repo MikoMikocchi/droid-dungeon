@@ -1,11 +1,11 @@
 package com.droiddungeon.render.lighting;
 
-import com.droiddungeon.grid.DungeonGenerator.Room;
-import com.droiddungeon.grid.Grid;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import com.droiddungeon.grid.DungeonGenerator.Room;
+import com.droiddungeon.grid.Grid;
 
 /**
  * Manages light sources in the game world.

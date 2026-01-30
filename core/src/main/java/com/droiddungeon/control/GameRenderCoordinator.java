@@ -4,16 +4,16 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.debug.DebugTextBuilder;
 import com.droiddungeon.input.InputFrame;
-import com.droiddungeon.runtime.GameContext;
-import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.render.effects.ScreenEffectRenderer;
 import com.droiddungeon.render.effects.VignetteEffect;
 import com.droiddungeon.render.lighting.LightingSystem;
+import com.droiddungeon.runtime.GameContext;
+import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
-import com.droiddungeon.ui.MinimapRenderer;
 import com.droiddungeon.ui.MapOverlay;
+import com.droiddungeon.ui.MinimapRenderer;
 
 /**
  * Coordinates rendering of world, HUD, debug, and map overlay.

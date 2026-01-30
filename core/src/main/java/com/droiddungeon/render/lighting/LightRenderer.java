@@ -1,5 +1,8 @@
 package com.droiddungeon.render.lighting;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -17,9 +20,6 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.grid.Grid;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Main lighting system renderer.

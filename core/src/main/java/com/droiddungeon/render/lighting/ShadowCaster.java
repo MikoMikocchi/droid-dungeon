@@ -1,10 +1,10 @@
 package com.droiddungeon.render.lighting;
 
-import com.badlogic.gdx.math.Vector2;
-import com.droiddungeon.grid.Grid;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import com.badlogic.gdx.math.Vector2;
+import com.droiddungeon.grid.Grid;
 
 /**
  * Casts 2D shadows from light sources based on wall/block geometry.
