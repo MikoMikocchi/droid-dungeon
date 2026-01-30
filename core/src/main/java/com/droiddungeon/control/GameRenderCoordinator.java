@@ -27,8 +27,8 @@ public final class GameRenderCoordinator {
     private LightingSystem lightingSystem;
     private boolean lightingEnabled = true;
 
-    // Debug overlay visibility (toggled with F3)
-    private boolean debugVisible = true;
+    // Toggled with F3
+    private boolean debugVisible = false;
 
     public GameRenderCoordinator() {
         worldRenderer = new WorldRenderer();

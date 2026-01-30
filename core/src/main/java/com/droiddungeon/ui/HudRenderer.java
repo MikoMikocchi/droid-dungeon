@@ -41,6 +41,8 @@ public final class HudRenderer {
     private final float craftHeaderHeight = 24f;
     private final float craftButtonWidth = 82f;
     private final float craftButtonHeight = 32f;
+    private final float healthBarHeight = 18f;
+    private final float healthBarGap = 8f;
 
     private float lastOriginX;
     private float lastOriginY;
@@ -52,6 +54,7 @@ public final class HudRenderer {
     private boolean craftingVisible;
     private int iconRows;
     private int lastRecipeCount;
+    private float healthBarY;
 
     private boolean tooltipVisible;
     private String tooltipText;
@@ -110,14 +113,21 @@ public final class HudRenderer {
 
     private void cacheLayout(Viewport viewport, boolean inventoryOpen, int recipeCount) {
         float viewportWidth = viewport.getWorldWidth();
+        float viewportHeight = viewport.getWorldHeight();
         float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
 
         lastRows = inventoryOpen ? 4 : 1;
-        lastOriginY = padding;
         lastRecipeCount = Math.max(0, recipeCount);
 
+        float gridHeight = lastRows * cellSize + (lastRows - 1) * gap;
+        float topY = viewportHeight - padding;
+
+        healthBarY = topY - healthBarHeight;
+        float gridTopY = healthBarY - healthBarGap;
+
+        lastOriginX = padding;
+        lastOriginY = gridTopY - cellSize;
         if (!inventoryOpen) {
-            lastOriginX = (viewportWidth - hotbarWidth) * 0.5f;
             craftingVisible = false;
             craftPanelHeight = 0f;
             craftPanelWidth = 0f;
@@ -125,7 +135,6 @@ public final class HudRenderer {
         }
 
         float gridWidth = hotbarWidth;
-        float gridHeight = lastRows * cellSize + (lastRows - 1) * gap;
 
         iconRows = Math.max(1, (int) Math.ceil(lastRecipeCount / (float) craftIconsPerRow));
         float iconsHeight = iconRows * (craftIconSize + craftIconGap) - craftIconGap;
@@ -134,10 +143,8 @@ public final class HudRenderer {
         craftPanelHeight = Math.max(craftHeaderHeight + craftPanelPadding * 2f + bodyHeight, gridHeight + 30f);
         craftPanelWidth = craftPanelWidthBase;
 
-        float totalWidth = gridWidth + craftPanelGap + craftPanelWidth;
-        lastOriginX = (viewportWidth - totalWidth) * 0.5f;
         craftPanelX = lastOriginX + gridWidth + craftPanelGap;
-        craftPanelY = lastOriginY;
+        craftPanelY = topY - craftPanelHeight;
         craftingVisible = true;
     }
 
@@ -169,6 +176,10 @@ public final class HudRenderer {
         shapeRenderer.end();
 
         Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private float rowY(int row) {
+        return lastOriginY - row * (cellSize + gap);
     }
 
     private void renderInventoryBackdropFilled(float viewportWidth, float viewportHeight) {
@@ -222,7 +233,7 @@ public final class HudRenderer {
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
                 float x = lastOriginX + col * (cellSize + gap);
-                float y = lastOriginY + row * (cellSize + gap);
+                float y = rowY(row);
 
                 boolean isHotbar = row == 0;
                 if (isHotbar) {
@@ -246,7 +257,7 @@ public final class HudRenderer {
 
             if (selectedRow >= 0 && selectedRow < lastRows) {
                 float x = lastOriginX + selectedCol * (cellSize + gap);
-                float y = lastOriginY + selectedRow * (cellSize + gap);
+                float y = rowY(selectedRow);
 
                 float thickness = 3f;
                 shapeRenderer.setColor(1f, 0.84f, 0.35f, 1f);
@@ -263,7 +274,7 @@ public final class HudRenderer {
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
                 float x = lastOriginX + col * (cellSize + gap);
-                float y = lastOriginY + row * (cellSize + gap);
+                float y = rowY(row);
                 shapeRenderer.rect(x, y, cellSize, cellSize);
             }
         }
@@ -500,7 +511,7 @@ public final class HudRenderer {
                 float iconPadding = 8f;
                 float drawSize = cellSize - iconPadding * 2f;
                 float drawX = lastOriginX + col * (cellSize + gap) + iconPadding;
-                float drawY = lastOriginY + row * (cellSize + gap) + iconPadding;
+                float drawY = rowY(row) + iconPadding;
                 spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
 
                 String countText = Integer.toString(stack.count());
@@ -631,9 +642,9 @@ public final class HudRenderer {
             return;
         }
         float barWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
-        float barHeight = 18f;
+        float barHeight = healthBarHeight;
         float x = lastOriginX;
-        float y = lastOriginY + lastRows * (cellSize + gap) + 10f;
+        float y = healthBarY;
 
         float ratio = Math.max(0f, Math.min(1f, stats.getHealthRatio()));
 
@@ -693,7 +704,7 @@ public final class HudRenderer {
         shapeRenderer.end();
 
         spriteBatch.begin();
-        String title = "YOU DIED";
+        String title = "Game Over";
         glyphLayout.setText(font, title);
         float titleX = (viewport.getWorldWidth() - glyphLayout.width) * 0.5f;
         float titleY = btn.y + btn.height + glyphLayout.height + 28f;
@@ -719,7 +730,7 @@ public final class HudRenderer {
         for (int row = 0; row < lastRows; row++) {
             for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
                 float x = lastOriginX + col * (cellSize + gap);
-                float y = lastOriginY + row * (cellSize + gap);
+                float y = rowY(row);
                 if (world.x >= x && world.x <= x + cellSize && world.y >= y && world.y <= y + cellSize) {
                     return row * Inventory.HOTBAR_SLOTS + col;
                 }

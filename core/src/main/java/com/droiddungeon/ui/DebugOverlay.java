@@ -39,7 +39,7 @@ public final class DebugOverlay {
         float boxHeight = glyphLayout.height + paddingY * 2f;
 
         float x = margin;
-        float y = viewport.getWorldHeight() - margin - boxHeight;
+        float y = margin;
 
         com.badlogic.gdx.Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND);
         com.badlogic.gdx.Gdx.gl.glBlendFunc(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA, com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
