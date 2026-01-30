@@ -9,8 +9,8 @@ public enum LightType {
     /** Personal light around player - large and bright */
     PLAYER_AURA(
             new Color(1.0f, 0.90f, 0.70f, 1f),  // Warm yellow-white
-            1.0f,   // intensity - full brightness
-            7.0f,   // radius tiles - larger for visibility
+            1.1f,   // intensity - brighter
+            8.5f,   // radius tiles - larger for visibility
             true,   // flicker
             0.05f,  // flicker intensity - subtle
             0.03f,  // flicker radius
@@ -20,8 +20,8 @@ public enum LightType {
     /** Wall-mounted torch */
     TORCH(
             new Color(1.0f, 0.75f, 0.40f, 1f),  // Orange-yellow
-            0.9f,
-            5.0f,
+            1.0f,
+            6.2f,
             true,
             0.12f,
             0.06f,
@@ -31,8 +31,8 @@ public enum LightType {
     /** Campfire or larger fire source */
     CAMPFIRE(
             new Color(1.0f, 0.70f, 0.35f, 1f),  // Deep orange
-            1.0f,
-            8.0f,
+            1.1f,
+            9.0f,
             true,
             0.15f,
             0.08f,
@@ -42,8 +42,8 @@ public enum LightType {
     /** Small candle */
     CANDLE(
             new Color(1.0f, 0.85f, 0.55f, 1f),  // Pale orange
-            0.7f,
-            2.5f,
+            0.8f,
+            3.0f,
             true,
             0.20f,
             0.12f,
@@ -53,8 +53,8 @@ public enum LightType {
     /** Lantern (more stable than torch) */
     LANTERN(
             new Color(1.0f, 0.88f, 0.62f, 1f),  // Warm yellow
-            0.9f,
-            5.5f,
+            1.0f,
+            6.5f,
             true,
             0.06f,
             0.03f,
@@ -64,8 +64,8 @@ public enum LightType {
     /** Magical/crystal light (cooler but still warm) */
     CRYSTAL(
             new Color(0.95f, 0.90f, 0.80f, 1f),  // Warm white
-            0.8f,
-            4.0f,
+            0.9f,
+            5.0f,
             true,
             0.04f,
             0.02f,
@@ -75,8 +75,8 @@ public enum LightType {
     /** Ambient room light (very subtle) */
     AMBIENT(
             new Color(0.95f, 0.88f, 0.75f, 1f),
-            0.3f,
-            12.0f,
+            0.45f,
+            14.0f,
             false,
             0f,
             0f,

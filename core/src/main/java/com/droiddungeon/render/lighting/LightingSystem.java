@@ -17,8 +17,8 @@ public class LightingSystem {
     private final Random random;
 
     // Light generation settings
-    private float torchSpacing = 6f;  // Minimum tiles between torches
-    private float roomLightDensity = 0.15f;  // Chance per valid position
+    private float torchSpacing = 4f;  // Minimum tiles between torches (closer = brighter)
+    private float roomLightDensity = 0.20f;  // Chance per valid position
     private boolean autoPlaceLights = true;
 
     // Track which chunks have had lights generated
@@ -103,12 +103,19 @@ public class LightingSystem {
         float centerY = (room.y + room.height * 0.5f) * tileSize;
 
         Light centerLight = LightType.LANTERN.createLight(centerX, centerY, tileSize);
-        centerLight.setRadius(centerLight.getRadius() * 1.3f);  // Larger for safe rooms
+        centerLight.setRadius(centerLight.getRadius() * 1.45f);  // Larger for safe rooms
+        centerLight.setIntensity(centerLight.getIntensity() * 1.1f);
         renderer.addLight(centerLight);
+
+        // Add a soft ambient fill so the entire room is readable
+        Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+        ambient.setRadius(ambient.getRadius() * 1.35f);
+        ambient.setIntensity(ambient.getIntensity() * 1.05f);
+        renderer.addLight(ambient);
 
         // Add wall torches if room is large enough
         if (room.width >= 6 && room.height >= 6) {
-            addWallTorches(grid, room, 0.4f);  // 40% coverage
+            addWallTorches(grid, room, 0.55f);  // denser coverage
         }
     }
 
@@ -123,13 +130,22 @@ public class LightingSystem {
         // Small chance for a central fire
         if (random.nextFloat() < 0.25f && room.width >= 5 && room.height >= 5) {
             Light fire = LightType.CAMPFIRE.createLight(centerX, centerY, tileSize);
-            fire.setRadius(fire.getRadius() * 0.8f);
+            fire.setRadius(fire.getRadius() * 0.95f);
+            fire.setIntensity(fire.getIntensity() * 1.1f);
             renderer.addLight(fire);
         }
 
-        // Sparse wall torches
+        // Sparse wall torches but a touch brighter than before
         if (room.width >= 5 || room.height >= 5) {
-            addWallTorches(grid, room, 0.15f);  // 15% coverage
+            addWallTorches(grid, room, 0.28f);  // more coverage for visibility
+        }
+
+        // Add a very soft ambient wash in large danger rooms to avoid pitch black corners
+        if (room.width * room.height >= 36) {
+            Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+            ambient.setRadius(ambient.getRadius() * 1.1f);
+            ambient.setIntensity(ambient.getIntensity() * 0.85f);
+            renderer.addLight(ambient);
         }
     }
 
@@ -139,7 +155,14 @@ public class LightingSystem {
     private void generateDefaultLights(Grid grid, Room room) {
         // Simple torch placement
         if (room.width >= 4 && room.height >= 4) {
-            addWallTorches(grid, room, 0.25f);
+            addWallTorches(grid, room, 0.35f);
+            // Small ambient center to keep hallways readable
+            float centerX = (room.x + room.width * 0.5f) * tileSize;
+            float centerY = (room.y + room.height * 0.5f) * tileSize;
+            Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+            ambient.setRadius(ambient.getRadius() * 1.0f);
+            ambient.setIntensity(ambient.getIntensity() * 0.8f);
+            renderer.addLight(ambient);
         }
     }
 

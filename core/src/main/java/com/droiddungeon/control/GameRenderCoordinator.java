@@ -35,7 +35,7 @@ public final class GameRenderCoordinator {
         screenEffectRenderer = new ScreenEffectRenderer();
         // Reduce vignette intensity since we have proper lighting now
         VignetteEffect vignette = new VignetteEffect();
-        vignette.setAlpha(0.18f);  // Lighter vignette
+        vignette.setAlpha(0.12f);  // Even lighter vignette so edges don't crush blacks
         screenEffectRenderer.addEffect(vignette);
     }
 
@@ -49,9 +49,12 @@ public final class GameRenderCoordinator {
         lightingSystem = new LightingSystem(tileSize, worldSeed);
         // Configure for warm torch-like lighting
         // Ambient is the base darkness level - higher = brighter shadows
-        lightingSystem.getRenderer().setAmbientColor(0.20f, 0.16f, 0.12f);  // Warm brown ambient
+        // Push ambient up so rooms never go pitch-black, but keep a warm mood
+        lightingSystem.getRenderer().setAmbientColor(0.36f, 0.32f, 0.28f);
         lightingSystem.getRenderer().setAmbientIntensity(1.0f);
-        lightingSystem.getRenderer().setGlobalBrightness(1.0f);
+
+        // Slightly boost all light contributions for better visibility
+        lightingSystem.getRenderer().setGlobalBrightness(1.25f);
         lightingSystem.getRenderer().setShadowsEnabled(true);
     }
 

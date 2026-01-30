@@ -60,7 +60,7 @@ public class LightRenderer implements Disposable {
     // Configuration
     // For multiply blend: 1.0 = full scene brightness, 0.0 = complete darkness
     // Ambient ~0.85 means shadows show 85% of scene color (very subtle darkening)
-    private final Color ambientColor = new Color(0.82f, 0.80f, 0.78f, 1f);  // Very subtle shadow
+    private final Color ambientColor = new Color(0.82f, 0.80f, 0.78f, 1f);  // Overwritten by coordinator
     private float ambientIntensity = 1.0f;  // Multiplier for ambient
     private float globalBrightness = 1.5f;  // Master brightness control - boosted more
     private float maxLightIntensity = 1.0f;  // Max light contribution
@@ -457,7 +457,8 @@ public class LightRenderer implements Disposable {
         batch.setBlendFunction(GL20.GL_ONE, GL20.GL_ONE);
         
         // Light adds brightness on top of ambient to reach ~1.0 (full brightness)
-        float strength = intensity * globalBrightness * 0.4f;
+        // Slightly higher multiplier so lights punch through ambient more
+        float strength = intensity * globalBrightness * 0.55f;
         batch.setColor(
             color.r * strength,
             color.g * strength,
