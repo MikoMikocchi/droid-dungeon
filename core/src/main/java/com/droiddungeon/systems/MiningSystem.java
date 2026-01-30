@@ -47,6 +47,13 @@ public final class MiningSystem {
             resetProgress();
             return;
         }
+
+        ToolType tool = toolTypeFor(equippedItem);
+        // If a weapon (or any item without a mining tool type) is equipped, disable mining and highlighting.
+        if (equippedItem != null && tool == ToolType.NONE) {
+            resetProgress();
+            return;
+        }
         int targetX = (int) Math.floor(mouseWorld.x / tileSize);
         int targetY = (int) Math.floor(mouseWorld.y / tileSize);
 
@@ -82,7 +89,6 @@ public final class MiningSystem {
             return; // highlight only; no progress when not holding
         }
 
-        ToolType tool = toolTypeFor(equippedItem);
         float efficiency = block.efficiencyFor(tool);
         float dps = baseDamagePerSecond * Math.max(0f, efficiency);
         float damage = dps * deltaSeconds;
