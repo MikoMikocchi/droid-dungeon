@@ -6,6 +6,7 @@ bin/
 **/*.class
 .metals/
 scripts/
+.bloop/
 
 # IntelliJ / IDEA
 .idea/
