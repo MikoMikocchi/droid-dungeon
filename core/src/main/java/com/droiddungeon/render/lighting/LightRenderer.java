@@ -59,10 +59,10 @@ public class LightRenderer implements Disposable {
 
     // Configuration
     // For multiply blend: 1.0 = full scene brightness, 0.0 = complete darkness
-    // Ambient ~0.7 means shadows show 70% of scene color (light darkening)
-    private final Color ambientColor = new Color(0.65f, 0.60f, 0.55f, 1f);  // Light shadow darkness
+    // Ambient ~0.85 means shadows show 85% of scene color (very subtle darkening)
+    private final Color ambientColor = new Color(0.82f, 0.80f, 0.78f, 1f);  // Very subtle shadow
     private float ambientIntensity = 1.0f;  // Multiplier for ambient
-    private float globalBrightness = 1.2f;  // Master brightness control - boosted
+    private float globalBrightness = 1.5f;  // Master brightness control - boosted more
     private float maxLightIntensity = 1.0f;  // Max light contribution
     private boolean shadowsEnabled = false;  // Temporarily disabled for debugging
     private boolean softShadowsEnabled = false;  // Disabled for performance
@@ -363,10 +363,15 @@ public class LightRenderer implements Disposable {
             renderSingleLight(light, grid, tileSize);
         }
 
-        // Reset blend mode
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-
         lightMapFbo.end();
+
+        // IMPORTANT: Fully reset GL state after FBO rendering
+        // This ensures world renderer (including weapon fan stencil) works correctly
+        Gdx.gl.glDisable(GL20.GL_STENCIL_TEST);
+        Gdx.gl.glStencilMask(0xFF);
+        Gdx.gl.glClear(GL20.GL_STENCIL_BUFFER_BIT);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        Gdx.gl.glColorMask(true, true, true, true);
     }
 
     /**
@@ -537,10 +542,12 @@ public class LightRenderer implements Disposable {
             0, 0,
             screenW, screenH
         );
+        // Reset blend before ending batch
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         batch.end();
 
-        // Reset blend mode through batch API
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        // Also reset global GL blend mode to ensure other renderers work correctly
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     // Configuration methods
