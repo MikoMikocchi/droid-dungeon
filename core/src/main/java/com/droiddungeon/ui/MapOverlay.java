@@ -134,7 +134,6 @@ public final class MapOverlay {
         Rectangle listArea = listRect(uiViewport, mapArea);
         Vector2 world = uiViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
 
-        // Pan with WASD.
         float panSpeed = 30f; // tiles per second
         float dx = 0f;
         float dy = 0f;
@@ -156,7 +155,6 @@ public final class MapOverlay {
             zoom = MathUtils.clamp(zoom * 0.9f, minZoom, maxZoom);
         }
 
-        // Drag pan.
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
             if (!dragging && mapArea.contains(world)) {
                 dragging = true;
@@ -197,14 +195,12 @@ public final class MapOverlay {
             lastClickOnMap = inside;
             lastClickMs = now;
 
-            // UI gets priority
             if (handleButtonsClick(world, listArea)) {
                 return;
             }
             if (handleListClick(world, listArea)) {
                 return;
             }
-            // Select markers by click.
             if (inside) {
                 selectMarkerAt(world.x, world.y, mapArea);
             } else {
@@ -412,16 +408,12 @@ public final class MapOverlay {
             float x1 = x0 + room.width * zoom + pad * 2f;
             float y1 = y0 + room.height * zoom + pad * 2f;
 
-            // top-left
             shapeRenderer.rect(x0, y1 - thickness, segment, thickness);
             shapeRenderer.rect(x0, y1 - segment, thickness, segment);
-            // top-right
             shapeRenderer.rect(x1 - segment, y1 - thickness, segment, thickness);
             shapeRenderer.rect(x1 - thickness, y1 - segment, thickness, segment);
-            // bottom-left
             shapeRenderer.rect(x0, y0, segment, thickness);
             shapeRenderer.rect(x0, y0, thickness, segment);
-            // bottom-right
             shapeRenderer.rect(x1 - segment, y0, segment, thickness);
             shapeRenderer.rect(x1 - thickness, y0, thickness, segment);
         }
@@ -631,7 +623,6 @@ public final class MapOverlay {
             trackedMarkerId = -1;
             marker.setTracked(false);
         } else {
-            // clear previous
             for (MapMarker m : markers) {
                 m.setTracked(false);
             }

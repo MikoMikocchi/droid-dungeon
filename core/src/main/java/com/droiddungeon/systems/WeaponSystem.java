@@ -83,7 +83,6 @@ public final class WeaponSystem {
         WeaponSpec spec = specFor(equippedItem);
         boolean hasWeapon = spec != null;
 
-        // Decay timers first.
         if (swingTimer > 0f) {
             swingTimer = Math.max(0f, swingTimer - deltaSeconds);
         }

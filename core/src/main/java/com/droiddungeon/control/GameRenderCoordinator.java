@@ -70,7 +70,6 @@ public final class GameRenderCoordinator {
             boolean dead,
             boolean mapOpen
     ) {
-        // Update and generate lights for visible area
         if (lightingSystem != null && lightingEnabled) {
             float tileSize = ctx.grid().getTileSize();
             float playerWorldX = (ctx.player().getRenderX() + 0.5f) * tileSize;
@@ -78,7 +77,6 @@ public final class GameRenderCoordinator {
             
             lightingSystem.update(delta, playerWorldX, playerWorldY);
             
-            // Generate lights for visible chunks
             OrthographicCamera cam = (OrthographicCamera) worldViewport.getCamera();
             float halfW = cam.viewportWidth * cam.zoom * 0.5f;
             float halfH = cam.viewportHeight * cam.zoom * 0.5f;
@@ -88,7 +86,6 @@ public final class GameRenderCoordinator {
             int maxY = (int) Math.ceil((cam.position.y + halfH) / tileSize) + 2;
             lightingSystem.generateLightsForArea(ctx.grid(), minX, minY, maxX, maxY);
             
-            // Render light map
             lightingSystem.getRenderer().renderLightMap(worldViewport, ctx.grid(), tileSize);
         }
 

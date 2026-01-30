@@ -76,7 +76,6 @@ public final class MinimapRenderer {
         int sh = Math.round((mapHeight + pad * 2f) * Gdx.graphics.getBackBufferHeight() / viewportHeight);
         gl.glScissor(sx, sy, sw, sh);
 
-        // Tiles
         shapeRenderer.begin(ShapeType.Filled);
         for (int y = 0; y < windowSize; y++) {
             for (int x = 0; x < windowSize; x++) {
@@ -117,16 +116,12 @@ public final class MinimapRenderer {
             float ry0 = originY + (room.y - minY) * tile - cornerThickness;
             float rx1 = rx0 + room.width * tile + cornerThickness * 2f;
             float ry1 = ry0 + room.height * tile + cornerThickness * 2f;
-            // TL
             shapeRenderer.rect(rx0, ry1 - cornerThickness, segment, cornerThickness);
             shapeRenderer.rect(rx0, ry1 - segment, cornerThickness, segment);
-            // TR
             shapeRenderer.rect(rx1 - segment, ry1 - cornerThickness, segment, cornerThickness);
             shapeRenderer.rect(rx1 - cornerThickness, ry1 - segment, cornerThickness, segment);
-            // BL
             shapeRenderer.rect(rx0, ry0, segment, cornerThickness);
             shapeRenderer.rect(rx0, ry0, cornerThickness, segment);
-            // BR
             shapeRenderer.rect(rx1 - segment, ry0, segment, cornerThickness);
             shapeRenderer.rect(rx1 - cornerThickness, ry0, cornerThickness, segment);
         }

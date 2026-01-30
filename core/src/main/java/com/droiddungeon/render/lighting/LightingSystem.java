@@ -16,7 +16,6 @@ public class LightingSystem {
     private final float tileSize;
     private final Random random;
 
-    // Light generation settings
     private float torchSpacing = 4f;  // Minimum tiles between torches (closer = brighter)
     private float roomLightDensity = 0.20f;  // Chance per valid position
     private boolean autoPlaceLights = true;
@@ -37,10 +36,8 @@ public class LightingSystem {
      * @param playerY player world Y
      */
     public void update(float delta, float playerX, float playerY) {
-        // Update player light position
         renderer.setPlayerLight(playerX, playerY, tileSize);
 
-        // Update light animations
         renderer.update(delta);
     }
 
@@ -53,14 +50,12 @@ public class LightingSystem {
         List<Room> rooms = grid.getRoomsInArea(minX, minY, maxX, maxY);
 
         for (Room room : rooms) {
-            // Check if we've already processed this room's chunk
             long chunkKey = getChunkKey(room.x, room.y);
             if (processedChunks.contains(chunkKey)) {
                 continue;
             }
             processedChunks.add(chunkKey);
 
-            // Generate lights for this room
             generateRoomLights(grid, room);
         }
     }
@@ -88,7 +83,6 @@ public class LightingSystem {
                 generateDangerRoomLights(grid, room);
                 break;
             default:
-                // Default lighting
                 generateDefaultLights(grid, room);
                 break;
         }
@@ -98,7 +92,6 @@ public class LightingSystem {
      * Generate lights for safe rooms - well lit with lanterns.
      */
     private void generateSafeRoomLights(Grid grid, Room room) {
-        // Place a central light source
         float centerX = (room.x + room.width * 0.5f) * tileSize;
         float centerY = (room.y + room.height * 0.5f) * tileSize;
 
@@ -153,7 +146,6 @@ public class LightingSystem {
      * Generate default lighting.
      */
     private void generateDefaultLights(Grid grid, Room room) {
-        // Simple torch placement
         if (room.width >= 4 && room.height >= 4) {
             addWallTorches(grid, room, 0.35f);
             // Small ambient center to keep hallways readable
@@ -173,7 +165,6 @@ public class LightingSystem {
     private void addWallTorches(Grid grid, Room room, float coverage) {
         List<int[]> wallPositions = findWallAdjacentPositions(grid, room);
 
-        // Shuffle for varied placement
         java.util.Collections.shuffle(wallPositions, random);
 
         int torchCount = Math.max(1, (int) (wallPositions.size() * coverage));
@@ -187,7 +178,6 @@ public class LightingSystem {
             float worldX = (pos[0] + 0.5f) * tileSize;
             float worldY = (pos[1] + 0.5f) * tileSize;
 
-            // Check spacing from other torches
             boolean tooClose = false;
             for (float[] existing : placedPositions) {
                 float dx = worldX - existing[0];
@@ -200,7 +190,6 @@ public class LightingSystem {
 
             if (!tooClose) {
                 Light torch = LightType.TORCH.createLight(worldX, worldY, tileSize);
-                // Slight random variation
                 torch.setFlickerSpeed(torch.getFlickerSpeed() * (0.8f + random.nextFloat() * 0.4f));
                 torch.setIntensity(torch.getIntensity() * (0.85f + random.nextFloat() * 0.15f));
                 renderer.addLight(torch);
@@ -217,11 +206,9 @@ public class LightingSystem {
     private List<int[]> findWallAdjacentPositions(Grid grid, Room room) {
         List<int[]> positions = new ArrayList<>();
 
-        // Check positions along edges of room interior
         for (int x = room.x + 1; x < room.x + room.width - 1; x++) {
             for (int y = room.y + 1; y < room.y + room.height - 1; y++) {
                 if (!grid.hasBlock(x, y)) {
-                    // Check if adjacent to a wall
                     if (grid.hasBlock(x - 1, y) || grid.hasBlock(x + 1, y) ||
                         grid.hasBlock(x, y - 1) || grid.hasBlock(x, y + 1)) {
                         positions.add(new int[]{x, y});
@@ -270,8 +257,6 @@ public class LightingSystem {
         processedChunks.clear();
         renderer.clearLights();
     }
-
-    // Configuration
 
     public void setTorchSpacing(float tiles) {
         this.torchSpacing = Math.max(2f, tiles);

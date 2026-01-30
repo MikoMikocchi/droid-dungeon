@@ -197,18 +197,15 @@ public final class WorldRenderer {
 
         int fillSegments = Math.max(32, Math.round(weaponState.arcRad() * MathUtils.radDeg));
 
-        // Write mask only.
         Gdx.gl.glColorMask(false, false, false, false);
         shapeRenderer.begin(ShapeType.Filled);
         drawFan(shapeRenderer, centerX, centerY, innerRadius, outerRadius, startAngle, weaponState.arcRad(), fillSegments);
         shapeRenderer.end();
 
-        // Enable color writes and only draw where mask == 1.
         Gdx.gl.glColorMask(true, true, true, true);
         Gdx.gl.glStencilFunc(GL20.GL_EQUAL, 1, 0xFF);
         Gdx.gl.glStencilOp(GL20.GL_KEEP, GL20.GL_KEEP, GL20.GL_KEEP);
 
-        // Base fill for the whole fan.
         shapeRenderer.begin(ShapeType.Filled);
         shapeRenderer.setColor(0.62f, 0.78f, 1f, baseAlpha);
         drawFan(shapeRenderer, centerX, centerY, innerRadius, outerRadius, startAngle, weaponState.arcRad(), fillSegments);
@@ -344,7 +341,7 @@ public final class WorldRenderer {
                 float wx = x * tileSize;
                 float wy = y * tileSize;
 
-                // Floor base
+
                 Color floorColor = tempColor.set(colorFor(floor, roomType, x + y));
                 spriteBatch.setColor(floorColor);
                 spriteBatch.draw(floorRegion, wx, wy, tileSize, tileSize);
@@ -512,16 +509,12 @@ public final class WorldRenderer {
             float x1 = x0 + room.width * tileSize + pad * 2f;
             float y1 = y0 + room.height * tileSize + pad * 2f;
 
-            // Top-left corner
             shapeRenderer.rect(x0, y1 - thickness, segment, thickness);
             shapeRenderer.rect(x0, y1 - segment, thickness, segment);
-            // Top-right
             shapeRenderer.rect(x1 - segment, y1 - thickness, segment, thickness);
             shapeRenderer.rect(x1 - thickness, y1 - segment, thickness, segment);
-            // Bottom-left
             shapeRenderer.rect(x0, y0, segment, thickness);
             shapeRenderer.rect(x0, y0, thickness, segment);
-            // Bottom-right
             shapeRenderer.rect(x1 - segment, y0, segment, thickness);
             shapeRenderer.rect(x1 - thickness, y0, thickness, segment);
         }

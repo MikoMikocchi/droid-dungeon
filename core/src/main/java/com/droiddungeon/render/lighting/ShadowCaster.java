@@ -88,9 +88,7 @@ public class ShadowCaster {
             int tileX = (int) Math.floor(checkX / tileSize);
             int tileY = (int) Math.floor(checkY / tileSize);
 
-            // Check if this tile blocks light
             if (grid.hasBlock(tileX, tileY) && !grid.isTransparent(tileX, tileY)) {
-                // Find exact intersection with tile boundary
                 return findTileEdgeIntersection(startX, startY, dirX, dirY, tileX, tileY, tileSize, dist);
             }
 
@@ -113,7 +111,6 @@ public class ShadowCaster {
         float minDist = approxDist;
 
         // Check intersection with each edge
-        // Left edge
         if (dirX > 0.0001f) {
             float t = (tileLeft - startX) / dirX;
             if (t > 0 && t < minDist) {
@@ -123,7 +120,6 @@ public class ShadowCaster {
                 }
             }
         }
-        // Right edge
         if (dirX < -0.0001f) {
             float t = (tileRight - startX) / dirX;
             if (t > 0 && t < minDist) {
@@ -133,7 +129,6 @@ public class ShadowCaster {
                 }
             }
         }
-        // Bottom edge
         if (dirY > 0.0001f) {
             float t = (tileBottom - startY) / dirY;
             if (t > 0 && t < minDist) {
@@ -143,9 +138,8 @@ public class ShadowCaster {
                 }
             }
         }
-        // Top edge
         if (dirY < -0.0001f) {
-            float t = (tileTop - startY) / dirY;
+            float t = (tileTop - startX) / dirY;
             if (t > 0 && t < minDist) {
                 float x = startX + dirX * t;
                 if (x >= tileLeft && x <= tileRight) {

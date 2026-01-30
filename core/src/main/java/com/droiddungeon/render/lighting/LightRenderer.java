@@ -31,13 +31,11 @@ import com.droiddungeon.grid.Grid;
  * 3. Composite light map over scene using multiply blending
  */
 public class LightRenderer implements Disposable {
-    // Render targets
     private FrameBuffer lightMapFbo;
     private TextureRegion lightMapRegion;
     private int fboWidth;
     private int fboHeight;
 
-    // Rendering resources
     private final SpriteBatch batch;
     private final ShapeRenderer shapeRenderer;
     private ShaderProgram lightShader;
@@ -50,14 +48,11 @@ public class LightRenderer implements Disposable {
     // Noise texture for variation
     private Texture noiseTexture;
 
-    // Shadow casting
     private final ShadowCaster shadowCaster;
 
-    // Light sources
     private final List<Light> lights = new ArrayList<>();
     private Light playerLight;
 
-    // Configuration
     // For multiply blend: 1.0 = full scene brightness, 0.0 = complete darkness
     // Ambient ~0.85 means shadows show 85% of scene color (very subtle darkening)
     private final Color ambientColor = new Color(0.82f, 0.80f, 0.78f, 1f);  // Overwritten by coordinator
@@ -67,7 +62,6 @@ public class LightRenderer implements Disposable {
     private boolean shadowsEnabled = false;  // Temporarily disabled for debugging
     private boolean softShadowsEnabled = false;  // Disabled for performance
 
-    // Temporary matrices
     private final Matrix4 tempMatrix = new Matrix4();
 
     public LightRenderer() {
@@ -343,7 +337,6 @@ public class LightRenderer implements Disposable {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_ONE, GL20.GL_ONE);
 
-        // Render each light
         float viewHalfW = cam.viewportWidth * cam.zoom * 0.5f;
         float viewHalfH = cam.viewportHeight * cam.zoom * 0.5f;
 
@@ -352,7 +345,6 @@ public class LightRenderer implements Disposable {
 
             float lightRadius = light.getCurrentRadius();
 
-            // Frustum culling
             if (light.getX() + lightRadius < cam.position.x - viewHalfW ||
                 light.getX() - lightRadius > cam.position.x + viewHalfW ||
                 light.getY() + lightRadius < cam.position.y - viewHalfH ||
@@ -437,10 +429,8 @@ public class LightRenderer implements Disposable {
         Gdx.gl.glStencilOp(GL20.GL_KEEP, GL20.GL_KEEP, GL20.GL_KEEP);
         Gdx.gl.glStencilMask(0x00);
 
-        // Render the light
         renderLightSimple(x, y, radius, intensity, color);
 
-        // Add soft shadow edges if enabled
         if (softShadowsEnabled) {
             renderSoftShadowEdges(light, shadowResult);
         }
@@ -550,8 +540,6 @@ public class LightRenderer implements Disposable {
         // Also reset global GL blend mode to ensure other renderers work correctly
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
-
-    // Configuration methods
 
     public void setAmbientColor(Color color) {
         this.ambientColor.set(color);

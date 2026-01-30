@@ -17,7 +17,6 @@ public interface ScreenEffect extends Disposable {
      * Override if the effect keeps buffers or cached data that depends on size.
      */
     default void resize(int width, int height) {
-        // no-op by default
     }
 
     /**

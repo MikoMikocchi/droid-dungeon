@@ -19,7 +19,6 @@ public final class LightingAssets implements Disposable {
     private final Map<String, Texture> textures = new HashMap<>();
     private final Map<String, TextureRegion> regions = new HashMap<>();
 
-    // Pre-defined asset names
     public static final String GRADIENT_SOFT_64 = "light_gradient_64_soft";
     public static final String GRADIENT_SOFT_128 = "light_gradient_128_soft";
     public static final String GRADIENT_SOFT_256 = "light_gradient_256_soft";
@@ -137,15 +136,12 @@ public final class LightingAssets implements Disposable {
      * Preload commonly used textures.
      */
     public void preload() {
-        // Preload gradient textures
-        getTexture(GRADIENT_SOFT_256);
+            getTexture(GRADIENT_SOFT_256);
         getTexture(GRADIENT_MEDIUM_256);
         getTexture(GRADIENT_WHITE);
 
-        // Preload noise
         getTexture(NOISE_A);
 
-        // Preload light sources
         getTexture(TORCH_1);
         getTexture(LANTERN);
         getTexture(CAMPFIRE);

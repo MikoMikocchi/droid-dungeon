@@ -135,7 +135,6 @@ public final class HudRenderer {
             }
         }
 
-        // Selection highlight.
         if (selectedSlotIndex >= 0 && selectedSlotIndex < Inventory.TOTAL_SLOTS) {
             int selectedRow = selectedSlotIndex / Inventory.HOTBAR_SLOTS;
             int selectedCol = selectedSlotIndex % Inventory.HOTBAR_SLOTS;
@@ -367,7 +366,6 @@ public final class HudRenderer {
         shapeRenderer.setColor(0f, 0f, 0f, 0.55f);
         shapeRenderer.rect(0f, 0f, viewport.getWorldWidth(), viewport.getWorldHeight());
 
-        // Button
         shapeRenderer.setColor(restartHovered ? new Color(0.32f, 0.65f, 0.9f, 1f) : new Color(0.24f, 0.38f, 0.52f, 1f));
         shapeRenderer.rect(btn.x, btn.y, btn.width, btn.height);
         shapeRenderer.setColor(1f, 1f, 1f, 0.25f);
