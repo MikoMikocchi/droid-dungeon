@@ -8,7 +8,7 @@ import com.droiddungeon.items.ToolType;
  * floor and block can share a material identity.
  */
 public enum BlockMaterial {
-    STONE(TileMaterial.STONE, 12f, ToolType.PICKAXE, null, 0, false),
+    STONE(TileMaterial.STONE, 12f, ToolType.PICKAXE, "stone", 1, false),
     DIRT(TileMaterial.DIRT, 6f, ToolType.SHOVEL, null, 0, false),
     WOOD(TileMaterial.WOOD, 6f, ToolType.AXE, null, 0, false),
     GRAVEL(TileMaterial.GRAVEL, 5f, ToolType.SHOVEL, null, 0, false),
