@@ -86,6 +86,8 @@ public final class GameRuntime {
         mapOverlay = new MapOverlay(RenderAssets.font(14));
         movementController = new HeldMovementController();
         renderer = new GameRenderCoordinator();
+        // Initialize lighting system with tile size and world seed
+        renderer.initLighting(config.tileSize(), worldSeed);
         inputController = new GameInputController(inputBindings, renderer.hudRenderer());
         mapController = new MapController();
         updater = new GameUpdater(config, cameraController, movementController);

@@ -354,13 +354,15 @@ public final class WorldRenderer {
                     int mask = exposedMask(grid, x, y);
                     TextureRegion blockRegion = wallAutoTiles[Math.min(mask, wallAutoTiles.length - 1)];
                     Color blockColor = tempColor.set(colorFor(block.floorMaterial(), roomType, x + y));
-                    // Subtle brightness shift toward exposed edges; keep interior closer to edge tones to avoid square seams.
+                    // Walls are now lit by the lighting system - use moderate base brightness
+                    // to allow lighting to have proper effect while keeping walls visible
                     int exposedCardinal = Integer.bitCount(mask & 0b1111);
                     int exposedDiagonal = Integer.bitCount(mask >> 4);
-                    float shade = 0.42f
-                            + 0.035f * exposedCardinal
-                            + 0.040f * exposedDiagonal;
-                    shade = Math.min(shade, 0.58f);
+                    // Raised base shade for better visibility, lighting system handles darkness
+                    float shade = 0.65f
+                            + 0.04f * exposedCardinal
+                            + 0.03f * exposedDiagonal;
+                    shade = Math.min(shade, 0.85f);
                     blockColor.mul(shade, shade, shade, 1f);
                     spriteBatch.setColor(blockColor);
                     spriteBatch.draw(blockRegion, wx, wy, tileSize, tileSize);

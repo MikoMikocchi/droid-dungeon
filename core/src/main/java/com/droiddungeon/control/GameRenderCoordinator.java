@@ -1,5 +1,6 @@
 package com.droiddungeon.control;
 
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.debug.DebugTextBuilder;
 import com.droiddungeon.input.InputFrame;
@@ -8,6 +9,7 @@ import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.render.effects.ScreenEffectRenderer;
 import com.droiddungeon.render.effects.VignetteEffect;
+import com.droiddungeon.render.lighting.LightingSystem;
 import com.droiddungeon.ui.DebugOverlay;
 import com.droiddungeon.ui.HudRenderer;
 import com.droiddungeon.ui.MinimapRenderer;
@@ -22,6 +24,8 @@ public final class GameRenderCoordinator {
     private final MinimapRenderer minimapRenderer;
     private final DebugOverlay debugOverlay;
     private final ScreenEffectRenderer screenEffectRenderer;
+    private LightingSystem lightingSystem;
+    private boolean lightingEnabled = true;
 
     public GameRenderCoordinator() {
         worldRenderer = new WorldRenderer();
@@ -29,7 +33,26 @@ public final class GameRenderCoordinator {
         minimapRenderer = new MinimapRenderer();
         debugOverlay = new DebugOverlay();
         screenEffectRenderer = new ScreenEffectRenderer();
-        screenEffectRenderer.addEffect(new VignetteEffect());
+        // Reduce vignette intensity since we have proper lighting now
+        VignetteEffect vignette = new VignetteEffect();
+        vignette.setAlpha(0.18f);  // Lighter vignette
+        screenEffectRenderer.addEffect(vignette);
+    }
+
+    /**
+     * Initialize the lighting system. Call once after game context is ready.
+     */
+    public void initLighting(float tileSize, long worldSeed) {
+        if (lightingSystem != null) {
+            lightingSystem.dispose();
+        }
+        lightingSystem = new LightingSystem(tileSize, worldSeed);
+        // Configure for warm torch-like lighting
+        // Ambient is the base darkness level - higher = brighter shadows
+        lightingSystem.getRenderer().setAmbientColor(0.20f, 0.16f, 0.12f);  // Warm brown ambient
+        lightingSystem.getRenderer().setAmbientIntensity(1.0f);
+        lightingSystem.getRenderer().setGlobalBrightness(1.0f);
+        lightingSystem.getRenderer().setShadowsEnabled(true);
     }
 
     public boolean render(
@@ -44,6 +67,28 @@ public final class GameRenderCoordinator {
             boolean dead,
             boolean mapOpen
     ) {
+        // Update and generate lights for visible area
+        if (lightingSystem != null && lightingEnabled) {
+            float tileSize = ctx.grid().getTileSize();
+            float playerWorldX = (ctx.player().getRenderX() + 0.5f) * tileSize;
+            float playerWorldY = (ctx.player().getRenderY() + 0.5f) * tileSize;
+            
+            lightingSystem.update(delta, playerWorldX, playerWorldY);
+            
+            // Generate lights for visible chunks
+            OrthographicCamera cam = (OrthographicCamera) worldViewport.getCamera();
+            float halfW = cam.viewportWidth * cam.zoom * 0.5f;
+            float halfH = cam.viewportHeight * cam.zoom * 0.5f;
+            int minX = (int) Math.floor((cam.position.x - halfW) / tileSize) - 2;
+            int maxX = (int) Math.ceil((cam.position.x + halfW) / tileSize) + 2;
+            int minY = (int) Math.floor((cam.position.y - halfH) / tileSize) - 2;
+            int maxY = (int) Math.ceil((cam.position.y + halfH) / tileSize) + 2;
+            lightingSystem.generateLightsForArea(ctx.grid(), minX, minY, maxX, maxY);
+            
+            // Render light map
+            lightingSystem.getRenderer().renderLightMap(worldViewport, ctx.grid(), tileSize);
+        }
+
         worldRenderer.render(
                 worldViewport,
                 update.gridOriginX(),
@@ -58,6 +103,11 @@ public final class GameRenderCoordinator {
                 ctx.companionSystem().getRenderX(),
                 ctx.companionSystem().getRenderY()
         );
+
+        // Apply lighting after world rendering, before screen effects
+        if (lightingSystem != null && lightingEnabled) {
+            lightingSystem.getRenderer().compositeLightMap();
+        }
 
         // Post-process style screen effects should sit between world and UI so the HUD stays crisp.
         screenEffectRenderer.render(uiViewport, delta);
@@ -123,6 +173,9 @@ public final class GameRenderCoordinator {
 
     public void resize(int width, int height) {
         screenEffectRenderer.resize(width, height);
+        if (lightingSystem != null) {
+            lightingSystem.getRenderer().resize(width, height);
+        }
     }
 
     public void dispose() {
@@ -131,6 +184,21 @@ public final class GameRenderCoordinator {
         minimapRenderer.dispose();
         debugOverlay.dispose();
         screenEffectRenderer.dispose();
+        if (lightingSystem != null) {
+            lightingSystem.dispose();
+        }
+    }
+
+    public LightingSystem getLightingSystem() {
+        return lightingSystem;
+    }
+
+    public void setLightingEnabled(boolean enabled) {
+        this.lightingEnabled = enabled;
+    }
+
+    public boolean isLightingEnabled() {
+        return lightingEnabled;
     }
 
     public HudRenderer hudRenderer() {
