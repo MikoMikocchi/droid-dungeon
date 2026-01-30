@@ -1,6 +1,7 @@
 package com.droiddungeon.systems;
 
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.MathUtils;
 import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -16,8 +17,16 @@ public final class MiningSystem {
     private final InventorySystem inventorySystem;
     private final ItemRegistry itemRegistry;
 
-    private final float baseDamage = 4f;
+    private final float baseDamagePerSecond = 12f; // tuned so stone breaks in ~1s with correct tool
     private final float reachTiles = 1.5f;
+
+    private int targetX = Integer.MIN_VALUE;
+    private int targetY = Integer.MIN_VALUE;
+    private float accumulatedDamage = 0f;
+    private float targetHealth = 0f;
+    private BlockMaterial targetBlock = null;
+    private boolean hasHighlight = false;
+    private float progressRatio = 0f;
 
     public MiningSystem(Grid grid, InventorySystem inventorySystem, ItemRegistry itemRegistry) {
         this.grid = grid;
@@ -25,8 +34,17 @@ public final class MiningSystem {
         this.itemRegistry = itemRegistry;
     }
 
-    public void tryMine(Player player, ItemStack equippedItem, Vector2 mouseWorld, float tileSize) {
-        if (player == null || mouseWorld == null) {
+    public void update(
+            float deltaSeconds,
+            Player player,
+            ItemStack equippedItem,
+            Vector2 mouseWorld,
+            float tileSize,
+            boolean interactionEnabled,
+            boolean miningHeld
+    ) {
+        if (!interactionEnabled || player == null || mouseWorld == null) {
+            resetProgress();
             return;
         }
         int targetX = (int) Math.floor(mouseWorld.x / tileSize);
@@ -36,25 +54,69 @@ public final class MiningSystem {
         float dy = targetY + 0.5f - (player.getRenderY() + 0.5f);
         float dist2 = dx * dx + dy * dy;
         if (dist2 > reachTiles * reachTiles) {
+            resetProgress();
             return; // out of range
         }
 
         BlockMaterial block = grid.getBlockMaterial(targetX, targetY);
         if (block == null) {
+            resetProgress();
             return; // nothing to mine
+        }
+
+        boolean targetChanged = this.targetX != targetX || this.targetY != targetY || this.targetBlock != block;
+        if (targetChanged) {
+            accumulatedDamage = 0f;
+            this.targetX = targetX;
+            this.targetY = targetY;
+            this.targetBlock = block;
+            this.targetHealth = grid.getBlockHealth(targetX, targetY);
+        }
+
+        // Always update highlight while valid target exists.
+        hasHighlight = true;
+        progressRatio = 0f;
+
+        if (!miningHeld) {
+            accumulatedDamage = 0f;
+            return; // highlight only; no progress when not holding
         }
 
         ToolType tool = toolTypeFor(equippedItem);
         float efficiency = block.efficiencyFor(tool);
-        float damage = baseDamage * efficiency;
-        boolean destroyed = grid.damageBlock(targetX, targetY, damage);
+        float dps = baseDamagePerSecond * Math.max(0f, efficiency);
+        float damage = dps * deltaSeconds;
+        float remainingHealth = grid.getBlockHealth(targetX, targetY);
+        targetHealth = remainingHealth;
 
-        if (destroyed) {
-            if (block.dropItemId() != null && block.dropCount() > 0) {
+        accumulatedDamage += damage;
+        progressRatio = MathUtils.clamp(remainingHealth <= 0f ? 1f : accumulatedDamage / remainingHealth, 0f, 1f);
+
+        if (accumulatedDamage >= remainingHealth && remainingHealth > 0f) {
+            boolean destroyed = grid.damageBlock(targetX, targetY, remainingHealth);
+            if (destroyed && block.dropItemId() != null && block.dropCount() > 0) {
                 inventorySystem.addGroundStack(targetX, targetY,
                         new ItemStack(block.dropItemId(), block.dropCount()));
             }
+            resetProgress(); // completed; require re-aim to restart
         }
+    }
+
+    public MiningTarget getTarget() {
+        if (!hasHighlight) {
+            return null;
+        }
+        return new MiningTarget(targetX, targetY, progressRatio);
+    }
+
+    private void resetProgress() {
+        accumulatedDamage = 0f;
+        targetHealth = 0f;
+        targetBlock = null;
+        targetX = Integer.MIN_VALUE;
+        targetY = Integer.MIN_VALUE;
+        hasHighlight = false;
+        progressRatio = 0f;
     }
 
     private ToolType toolTypeFor(ItemStack equipped) {
@@ -63,4 +125,6 @@ public final class MiningSystem {
         }
         return itemRegistry.getToolType(equipped.itemId());
     }
+
+    public record MiningTarget(int x, int y, float progress) {}
 }

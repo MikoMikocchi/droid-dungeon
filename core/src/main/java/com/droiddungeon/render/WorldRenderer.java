@@ -24,6 +24,7 @@ import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.systems.WeaponSystem.WeaponState;
+import com.droiddungeon.systems.MiningSystem.MiningTarget;
 import com.droiddungeon.ui.MapMarker;
 
 public final class WorldRenderer {
@@ -64,7 +65,8 @@ public final class WorldRenderer {
             List<Enemy> enemies,
             MapMarker trackedMarker,
             float companionX,
-            float companionY
+            float companionY,
+            MiningTarget miningTarget
     ) {
         viewport.apply(false);
         shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
@@ -77,6 +79,7 @@ public final class WorldRenderer {
         renderTileFill(grid, tileSize, visible);
         spriteBatch.end();
 
+        renderMiningHighlight(miningTarget, gridOriginX, gridOriginY, tileSize);
         renderRoomCorners(grid, tileSize, visible);
         renderWeaponFan(weaponState, player, gridOriginX, gridOriginY, tileSize);
 
@@ -129,6 +132,38 @@ public final class WorldRenderer {
         shapeRenderer.setColor(0.95f, 0.8f, 0.3f, 0.9f);
         shapeRenderer.triangle(x1, y1, x2, y2, x3, y3);
         shapeRenderer.end();
+    }
+
+    private void renderMiningHighlight(MiningTarget target, float gridOriginX, float gridOriginY, float tileSize) {
+        if (target == null) {
+            return;
+        }
+        float x = gridOriginX + target.x() * tileSize;
+        float y = gridOriginY + target.y() * tileSize;
+        float inset = tileSize * 0.08f;
+        float size = tileSize - inset * 2f;
+        float progress = MathUtils.clamp(target.progress(), 0f, 1f);
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+        shapeRenderer.begin(ShapeType.Filled);
+        // Soft fill
+        shapeRenderer.setColor(0.82f, 0.9f, 1f, 0.22f);
+        shapeRenderer.rect(x + inset, y + inset, size, size);
+        // Progress bar at bottom of tile
+        float barHeight = Math.max(2.5f, tileSize * 0.12f);
+        float barWidth = size * progress;
+        shapeRenderer.setColor(0.25f, 0.65f, 1f, 0.8f);
+        shapeRenderer.rect(x + inset, y + inset, barWidth, barHeight);
+        shapeRenderer.end();
+
+        shapeRenderer.begin(ShapeType.Line);
+        shapeRenderer.setColor(0.25f, 0.65f, 1f, 0.9f);
+        shapeRenderer.rect(x + inset, y + inset, size, size);
+        shapeRenderer.end();
+
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void renderEnemies(List<Enemy> enemies, float gridOriginX, float gridOriginY, float tileSize) {

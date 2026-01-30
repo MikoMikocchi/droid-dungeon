@@ -70,17 +70,16 @@ public final class GameUpdater {
                     input.pointerOnUi()
             );
 
-            if (input.mineRequested()
-                    && !ctx.inventorySystem().isInventoryOpen()
-                    && !mapOpen
-                    && !input.pointerOnUi()) {
-                ctx.miningSystem().tryMine(
-                        ctx.player(),
-                        ctx.inventorySystem().getEquippedStack(),
-                        mouseWorld,
-                        worldViewportTileSize
-                );
-            }
+            boolean canInteract = !ctx.inventorySystem().isInventoryOpen() && !mapOpen && !input.pointerOnUi();
+            ctx.miningSystem().update(
+                    delta,
+                    ctx.player(),
+                    ctx.inventorySystem().getEquippedStack(),
+                    mouseWorld,
+                    worldViewportTileSize,
+                    canInteract,
+                    canInteract && input.mineRequested()
+            );
 
             ctx.enemySystem().update(delta, ctx.player(), ctx.playerStats(), weaponState);
         } else {
@@ -88,6 +87,15 @@ public final class GameUpdater {
             gridOriginX = cameraController.getGridOriginX();
             gridOriginY = cameraController.getGridOriginY();
             weaponState = WeaponSystem.WeaponState.inactive();
+            ctx.miningSystem().update(
+                    delta,
+                    ctx.player(),
+                    ctx.inventorySystem().getEquippedStack(),
+                    mouseWorld,
+                    worldViewportTileSize,
+                    false,
+                    false
+            );
         }
 
         return new GameUpdateResult(gridOriginX, gridOriginY, weaponState);

@@ -104,7 +104,8 @@ public final class GameRenderCoordinator {
                 ctx.enemySystem().getEnemies(),
                 mapOverlay.getTracked(),
                 ctx.companionSystem().getRenderX(),
-                ctx.companionSystem().getRenderY()
+                ctx.companionSystem().getRenderY(),
+                ctx.miningSystem().getTarget()
         );
 
         // Apply lighting after world rendering, before screen effects

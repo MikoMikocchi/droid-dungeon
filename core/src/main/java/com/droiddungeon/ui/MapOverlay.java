@@ -21,6 +21,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.enemies.Enemy;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.grid.TileMaterial;
@@ -36,6 +37,7 @@ public final class MapOverlay {
     private final AtomicInteger idGen = new AtomicInteger(1);
     private final List<MapMarker> markers = new ArrayList<>();
     private final Set<Long> explored = new HashSet<>();
+    private final Color tileColor = new Color();
 
     private boolean open;
     private float camX;
@@ -376,9 +378,16 @@ public final class MapOverlay {
                     shapeRenderer.rect(sx, sy, zoom, zoom);
                     continue;
                 }
-                TileMaterial mat = grid.getTileMaterial(x, y);
-                Color base = mat.colorForParity(x + y);
-                shapeRenderer.setColor(base.r, base.g, base.b, 1f);
+                BlockMaterial block = grid.getBlockMaterial(x, y);
+                if (block == null) {
+                    TileMaterial mat = grid.getTileMaterial(x, y);
+                    Color base = mat.colorForParity(x + y);
+                    tileColor.set(base).lerp(Color.WHITE, 0.12f); // brighter for walkable floor
+                } else {
+                    Color wall = block.floorMaterial().darkColor();
+                    tileColor.set(wall).lerp(Color.BLACK, 0.7f); // crush walls/solid rock darker
+                }
+                shapeRenderer.setColor(tileColor);
                 shapeRenderer.rect(sx, sy, zoom, zoom);
             }
         }

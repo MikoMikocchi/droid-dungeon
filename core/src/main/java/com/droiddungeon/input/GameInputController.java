@@ -37,7 +37,8 @@ public final class GameInputController {
         boolean mapToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_MAP);
         boolean mapCloseRequested = bindings.isJustPressed(InputAction.CLOSE_MAP);
         boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
-        boolean mineRequested = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && !pointerOnUi;
+        // Hold left mouse to mine; keep reporting while pressed for hold-to-break behavior.
+        boolean mineRequested = Gdx.input.isButtonPressed(Input.Buttons.LEFT) && !pointerOnUi;
         boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
 
         return new InputFrame(

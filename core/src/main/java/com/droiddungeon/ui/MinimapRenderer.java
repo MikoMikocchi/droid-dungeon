@@ -22,6 +22,7 @@ import com.droiddungeon.grid.Player;
 public final class MinimapRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
     private final Rectangle lastBounds = new Rectangle();
+    private final Color tmpColor = new Color();
 
     private final Color playerColor = new Color(0.98f, 0.86f, 0.3f, 1f);
     private final Color companionColor = new Color(0.35f, 0.85f, 0.95f, 1f);
@@ -87,15 +88,16 @@ public final class MinimapRenderer {
                     shapeRenderer.setColor(fogColor);
                     shapeRenderer.rect(drawX, drawY, tile, tile);
                 } else {
-                    Color base = grid.getTileMaterial(worldX, worldY).darkColor();
-                    shapeRenderer.setColor(base);
-                    shapeRenderer.rect(drawX, drawY, tile, tile);
                     BlockMaterial block = grid.getBlockMaterial(worldX, worldY);
-                    if (block != null) {
-                        Color blockColor = block.floorMaterial().darkColor().cpy().mul(0.85f);
-                        shapeRenderer.setColor(blockColor);
-                        shapeRenderer.rect(drawX, drawY, tile, tile);
+                    if (block == null) {
+                        Color floor = grid.getTileMaterial(worldX, worldY).darkColor();
+                        tmpColor.set(floor).lerp(Color.WHITE, 0.14f); // brighten walkable space
+                    } else {
+                        Color wall = block.floorMaterial().darkColor();
+                        tmpColor.set(wall).lerp(Color.BLACK, 0.65f); // darken solid rock/walls
                     }
+                    shapeRenderer.setColor(tmpColor);
+                    shapeRenderer.rect(drawX, drawY, tile, tile);
                 }
             }
         }
