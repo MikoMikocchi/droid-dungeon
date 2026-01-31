@@ -355,7 +355,7 @@ public final class HudRenderer {
             CraftingRecipe recipe = craftingSystem.getRecipes().get(i);
             ItemDefinition def = itemRegistry.get(recipe.resultItemId());
             TextureRegion icon = def != null ? def.icon() : null;
-            if (icon != null) {
+            if (hasIcon(icon)) {
                 spriteBatch.draw(icon, iconX(i) + 4f, iconY(i) + 4f, craftIconSize - 8f, craftIconSize - 8f);
             }
             boolean canCraft = craftingSystem.canCraft(i);
@@ -412,7 +412,7 @@ public final class HudRenderer {
             int owned = countInInventory(inventory, ingredient.itemId());
             boolean enough = owned >= ingredient.count();
 
-            if (icon != null) {
+            if (hasIcon(icon)) {
                 if (!enough) {
                     spriteBatch.setColor(1f, 0.6f, 0.55f, 1f);
                 }
@@ -508,6 +508,9 @@ public final class HudRenderer {
                     continue;
                 }
                 TextureRegion icon = def.icon();
+                if (!hasIcon(icon)) {
+                    continue;
+                }
                 float iconPadding = 8f;
                 float drawSize = cellSize - iconPadding * 2f;
                 float drawX = lastOriginX + col * (cellSize + gap) + iconPadding;
@@ -546,6 +549,9 @@ public final class HudRenderer {
         Vector2 screen = new Vector2(Gdx.input.getX(), Gdx.input.getY());
         Vector2 world = viewport.unproject(screen);
         TextureRegion icon = def.icon();
+        if (!hasIcon(icon)) {
+            return;
+        }
         float iconPadding = 6f;
         float drawSize = cellSize - iconPadding * 2f;
         float drawX = world.x - drawSize * 0.5f;
@@ -797,6 +803,10 @@ public final class HudRenderer {
         }
 
         return new CraftingHit(iconIndex, true, onButton);
+    }
+
+    private boolean hasIcon(TextureRegion icon) {
+        return icon != null && icon.getTexture() != null && icon.getRegionWidth() > 0 && icon.getRegionHeight() > 0;
     }
 
     public void dispose() {

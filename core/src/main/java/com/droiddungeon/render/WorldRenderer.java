@@ -408,6 +408,10 @@ public final class WorldRenderer {
         // Grid lines intentionally disabled (request: remove grid overlay). Keep method for quick re-enable if needed.
     }
 
+    private boolean hasIcon(TextureRegion icon) {
+        return icon != null && icon.getTexture() != null && icon.getRegionWidth() > 0 && icon.getRegionHeight() > 0;
+    }
+
     private void renderGroundItems(
             List<GroundItem> groundItems,
             ItemRegistry itemRegistry,
@@ -424,6 +428,9 @@ public final class WorldRenderer {
                 continue;
             }
             TextureRegion icon = def.icon();
+            if (!hasIcon(icon)) {
+                continue;
+            }
             float drawSize = tileSize * 0.68f;
             float drawX = gridOriginX + groundItem.getGridX() * tileSize + (tileSize - drawSize) * 0.5f;
             float drawY = gridOriginY + groundItem.getGridY() * tileSize + (tileSize - drawSize) * 0.5f;
