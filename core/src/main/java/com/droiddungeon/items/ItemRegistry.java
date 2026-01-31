@@ -1,7 +1,11 @@
 package com.droiddungeon.items;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +38,35 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
         return registry;
     }
 
+    /**
+     * Data-only loading for headless/server mode: textures are not read, icon = empty TextureRegion().
+     */
+    public static ItemRegistry loadDataOnly(Path path) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read items file: " + path, e);
+        }
+        return loadDataOnly(lines);
+    }
+
+    public static ItemRegistry loadDataOnly(List<String> lines) {
+        ItemRegistry registry = new ItemRegistry();
+        registry.loadFromLines(lines, false);
+        return registry;
+    }
+
     public void loadFromFile(String path) {
         FileHandle handle = Gdx.files.internal(path);
         if (!handle.exists()) {
             throw new IllegalStateException("Items file not found: " + path);
         }
         String[] lines = handle.readString(StandardCharsets.UTF_8.name()).split("\\R");
+        loadFromLines(Arrays.asList(lines), true);
+    }
+
+    public void loadFromLines(List<String> lines, boolean loadTextures) {
         for (String rawLine : lines) {
             String line = rawLine.trim();
             if (line.isEmpty() || line.startsWith("#")) {
@@ -47,7 +74,7 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
             }
             String[] parts = line.split(";");
             if (parts.length < 4) {
-                Gdx.app.error("ItemRegistry", "Invalid item line (expected id;name;maxStack;texturePath[;equippable;maxDurability;toolType]): " + line);
+                logError("Invalid item line (expected id;name;maxStack;texturePath[;equippable;maxDurability;toolType]): " + line);
                 continue;
             }
 
@@ -57,7 +84,7 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
             try {
                 maxStack = Integer.parseInt(parts[2].trim());
             } catch (NumberFormatException ex) {
-                Gdx.app.error("ItemRegistry", "Invalid max stack for item " + id + ": " + parts[2]);
+                logError("Invalid max stack for item " + id + ": " + parts[2]);
                 continue;
             }
             String texturePath = parts[3].trim();
@@ -71,7 +98,7 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
                 try {
                     maxDurability = Integer.parseInt(parts[5].trim());
                 } catch (NumberFormatException ex) {
-                    Gdx.app.error("ItemRegistry", "Invalid max durability for item " + id + ": " + parts[5]);
+                    logError("Invalid max durability for item " + id + ": " + parts[5]);
                     maxDurability = 0;
                 }
                 if (maxDurability < 0) {
@@ -82,19 +109,23 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
                 try {
                     toolType = ToolType.valueOf(parts[6].trim().toUpperCase());
                 } catch (IllegalArgumentException ex) {
-                    Gdx.app.error("ItemRegistry", "Invalid tool type for item " + id + ": " + parts[6]);
+                    logError("Invalid tool type for item " + id + ": " + parts[6]);
                     toolType = ToolType.NONE;
                 }
             }
             if (definitions.containsKey(id)) {
-                Gdx.app.log("ItemRegistry", "Skipping duplicate item id: " + id);
+                logInfo("Skipping duplicate item id: " + id);
                 continue;
             }
-            Texture texture = new Texture(Gdx.files.internal(texturePath));
-            texture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-            ownedTextures.add(texture);
-
-            TextureRegion region = new TextureRegion(texture);
+            TextureRegion region;
+            if (loadTextures) {
+                Texture texture = new Texture(Gdx.files.internal(texturePath));
+                texture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
+                ownedTextures.add(texture);
+                region = new TextureRegion(texture);
+            } else {
+                region = new TextureRegion(); // placeholder, no GL calls
+            }
             definitions.put(id, new ItemDefinition(id, displayName, maxStack, region, equippable, maxDurability, toolType));
         }
     }
@@ -141,5 +172,21 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     @Override
     public void close() {
         dispose();
+    }
+
+    private void logError(String message) {
+        if (Gdx.app != null) {
+            Gdx.app.error("ItemRegistry", message);
+        } else {
+            System.err.println("ItemRegistry ERROR: " + message);
+        }
+    }
+
+    private void logInfo(String message) {
+        if (Gdx.app != null) {
+            Gdx.app.log("ItemRegistry", message);
+        } else {
+            System.out.println("ItemRegistry: " + message);
+        }
     }
 }
