@@ -18,7 +18,7 @@ public final class GameInputController {
         this.hudRenderer = hudRenderer;
     }
 
-    public InputFrame collect(Viewport uiViewport, InventorySystem inventorySystem) {
+    public InputFrame collect(Viewport uiViewport, Viewport worldViewport, InventorySystem inventorySystem) {
         // hotbar selection / inventory toggle are handled inside the system for now
         inventorySystem.updateInput();
 
@@ -53,6 +53,25 @@ public final class GameInputController {
         boolean mineRequested = Gdx.input.isButtonPressed(Input.Buttons.LEFT) && !pointerOnUi;
         boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
 
+        MovementIntent movementIntent = new MovementIntent(
+                Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A),
+                Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D),
+                Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W),
+                Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S),
+                Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A),
+                Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D),
+                Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W),
+                Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)
+        );
+
+        var mouseWorld = worldViewport.unproject(new com.badlogic.gdx.math.Vector2(Gdx.input.getX(), Gdx.input.getY()));
+        WeaponInput weaponInput = new WeaponInput(
+                Gdx.input.isButtonJustPressed(Input.Buttons.LEFT),
+                Gdx.input.isButtonPressed(Input.Buttons.LEFT),
+                mouseWorld.x,
+                mouseWorld.y
+        );
+
         return new InputFrame(
                 slotUnderCursor,
                 hoveredSlot,
@@ -68,7 +87,9 @@ public final class GameInputController {
                 mapCloseRequested,
                 restartRequested,
                 mineRequested,
-                debugToggleRequested
+                debugToggleRequested,
+                movementIntent,
+                weaponInput
         );
     }
 }

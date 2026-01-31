@@ -3,11 +3,10 @@ package com.droiddungeon.systems;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.inventory.ItemStack;
 
 /**
@@ -76,7 +75,7 @@ public final class WeaponSystem {
             float deltaSeconds,
             Player player,
             ItemStack equippedItem,
-            Vector2 mouseWorld,
+            WeaponInput weaponInput,
             float gridOriginX,
             float gridOriginY,
             float tileSize,
@@ -97,8 +96,8 @@ public final class WeaponSystem {
             cooldownTimer = 0f;
         }
 
-        updateAim(player, mouseWorld, gridOriginX, gridOriginY, tileSize);
-        handleAttackInput(spec, inventoryOpen, pointerOnUi);
+        updateAim(player, weaponInput, gridOriginX, gridOriginY, tileSize);
+        handleAttackInput(spec, inventoryOpen, pointerOnUi, weaponInput);
 
         boolean swinging = swingTimer > 0f;
         float swingProgress = 0f;
@@ -146,19 +145,19 @@ public final class WeaponSystem {
         return specs.get(equippedItem.itemId());
     }
 
-    private void handleAttackInput(WeaponSpec spec, boolean inventoryOpen, boolean pointerOnUi) {
+    private void handleAttackInput(WeaponSpec spec, boolean inventoryOpen, boolean pointerOnUi, WeaponInput weaponInput) {
         if (spec == null || inventoryOpen || pointerOnUi) {
             return;
         }
-        if (Gdx.input.isButtonJustPressed(Input.Buttons.LEFT) && cooldownTimer <= 0f) {
+        if (weaponInput.attackJustPressed() && cooldownTimer <= 0f) {
             swingTimer = spec.swingDuration();
             cooldownTimer = spec.swingDuration() + spec.cooldownDuration();
             swingIndex++;
         }
     }
 
-    private void updateAim(Player player, Vector2 mouseWorld, float gridOriginX, float gridOriginY, float tileSize) {
-        tmpMouse.set(mouseWorld);
+    private void updateAim(Player player, WeaponInput weaponInput, float gridOriginX, float gridOriginY, float tileSize) {
+        tmpMouse.set(weaponInput.aimWorldX(), weaponInput.aimWorldY());
 
         float centerX = gridOriginX + (player.getRenderX() + 0.5f) * tileSize;
         float centerY = gridOriginY + (player.getRenderY() + 0.5f) * tileSize;

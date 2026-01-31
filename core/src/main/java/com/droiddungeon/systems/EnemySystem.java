@@ -3,7 +3,7 @@ package com.droiddungeon.systems;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
+import java.util.SplittableRandom;
 import java.util.Set;
 
 import com.droiddungeon.enemies.Enemy;
@@ -29,14 +29,14 @@ public final class EnemySystem {
     private final InventorySystem inventorySystem;
     private final List<Enemy> enemies = new ArrayList<>();
     private final Set<String> spawnedRooms = new HashSet<>();
-    private final Random ambientRng;
+    private final SplittableRandom ambientRng;
 
     public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, InventorySystem inventorySystem) {
         this.grid = grid;
         this.worldSeed = worldSeed;
         this.entityWorld = entityWorld;
         this.inventorySystem = inventorySystem;
-        this.ambientRng = new Random(worldSeed ^ 0xACEDBADEL);
+        this.ambientRng = new SplittableRandom(worldSeed ^ 0xACEDBADEL);
     }
 
     public List<Enemy> getEnemies() {
@@ -115,7 +115,7 @@ public final class EnemySystem {
         int area = room.width * room.height;
         int count = area > 220 ? 2 : 1;
 
-        Random rng = new Random(hashRoom(room));
+        SplittableRandom rng = new SplittableRandom(hashRoom(room));
         for (int i = 0; i < count; i++) {
             int spawnX = room.centerX();
             int spawnY = room.centerY();

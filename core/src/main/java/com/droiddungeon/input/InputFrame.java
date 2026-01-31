@@ -18,5 +18,7 @@ public record InputFrame(
         boolean mapCloseRequested,
         boolean restartRequested,
         boolean mineRequested,
-        boolean debugToggleRequested
+        boolean debugToggleRequested,
+        MovementIntent movementIntent,
+        WeaponInput weaponInput
 ){}

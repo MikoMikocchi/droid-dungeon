@@ -1,28 +1,27 @@
 package com.droiddungeon.input;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
+import com.droiddungeon.input.MovementIntent;
 
 public final class HeldMovementController {
     private Direction preferredDir = Direction.RIGHT;
 
-    public void update(Grid grid, Player player, EntityWorld entityWorld) {
+    public void update(Grid grid, Player player, EntityWorld entityWorld, MovementIntent input) {
         if (player.isMoving()) {
             return;
         }
 
-        boolean leftHeld = Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A);
-        boolean rightHeld = Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D);
-        boolean upHeld = Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W);
-        boolean downHeld = Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S);
+        boolean leftHeld = input.leftHeld();
+        boolean rightHeld = input.rightHeld();
+        boolean upHeld = input.upHeld();
+        boolean downHeld = input.downHeld();
 
-        boolean leftPressed = Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A);
-        boolean rightPressed = Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D);
-        boolean upPressed = Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W);
-        boolean downPressed = Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S);
+        boolean leftPressed = input.leftJustPressed();
+        boolean rightPressed = input.rightJustPressed();
+        boolean upPressed = input.upJustPressed();
+        boolean downPressed = input.downJustPressed();
 
         if (leftPressed) {
             preferredDir = Direction.LEFT;

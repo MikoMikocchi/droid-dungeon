@@ -3,7 +3,6 @@ package com.droiddungeon.runtime;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.config.GameConfig;
@@ -49,6 +48,7 @@ public final class GameRuntime {
     private GameRenderCoordinator renderer;
 
     private long worldSeed;
+    private boolean worldSeedForced;
     private int spawnX;
     private int spawnY;
     private MapOverlay mapOverlay;
@@ -70,6 +70,14 @@ public final class GameRuntime {
         this.inputBindings = InputBindings.defaults();
     }
 
+    /**
+     * Set the seed in advance (for example, from the server) before calling {@link #create()}.
+     */
+    public void setWorldSeed(long worldSeed) {
+        this.worldSeed = worldSeed;
+        this.worldSeedForced = true;
+    }
+
     public void create() {
         worldCamera = new OrthographicCamera();
         worldViewport = new ScreenViewport(worldCamera);
@@ -77,7 +85,9 @@ public final class GameRuntime {
         uiViewport = new ScreenViewport(uiCamera);
         cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
-        worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+        if (!worldSeedForced) {
+            worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+        }
         DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
         Grid grid = layout.grid();
         spawnX = layout.spawnX();
@@ -122,10 +132,8 @@ public final class GameRuntime {
             runStateManager.handlePlayerDeath(context, mapOverlay);
         }
 
-        InputFrame input = inputController.collect(uiViewport, inventorySystem);
+        InputFrame input = inputController.collect(uiViewport, worldViewport, inventorySystem);
         boolean mapOpen = mapController.update(input, mapOverlay, renderer.minimapBounds(), uiViewport, context);
-
-        Vector2 mouseWorld = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
 
         GameUpdateResult updateResult = updater.update(
                 delta,
@@ -133,7 +141,6 @@ public final class GameRuntime {
                 input,
                 context,
                 context.grid().getTileSize(),
-                mouseWorld,
                 mapOpen
         );
         weaponState = updateResult.weaponState();
