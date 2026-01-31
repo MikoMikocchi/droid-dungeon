@@ -11,6 +11,7 @@ import com.droiddungeon.control.GameUpdater;
 import com.droiddungeon.control.MapController;
 import com.droiddungeon.debug.DebugTextBuilder;
 import com.droiddungeon.entity.EntityWorld;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.input.GameInputController;
@@ -21,15 +22,6 @@ import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.items.TextureLoader;
-import com.droiddungeon.render.ClientAssets;
-import com.droiddungeon.systems.CameraController;
-import com.droiddungeon.systems.EnemySystem;
-import com.droiddungeon.systems.InventorySystem;
-import com.droiddungeon.systems.WeaponSystem;
-import com.droiddungeon.ui.MapOverlay;
-import com.droiddungeon.runtime.NetworkSnapshotBuffer;
-import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.net.NetworkClientAdapter;
 import com.droiddungeon.net.dto.BlockChangeDto;
 import com.droiddungeon.net.dto.ChunkSnapshotDto;
@@ -37,7 +29,12 @@ import com.droiddungeon.net.dto.EnemySnapshotDto;
 import com.droiddungeon.net.dto.GroundItemSnapshotDto;
 import com.droiddungeon.net.dto.WeaponStateSnapshotDto;
 import com.droiddungeon.net.dto.WorldSnapshotDto;
-import com.droiddungeon.grid.BlockMaterial;
+import com.droiddungeon.render.ClientAssets;
+import com.droiddungeon.systems.CameraController;
+import com.droiddungeon.systems.EnemySystem;
+import com.droiddungeon.systems.InventorySystem;
+import com.droiddungeon.systems.WeaponSystem;
+import com.droiddungeon.ui.MapOverlay;
 
 /**
  * Thin orchestration shell: wires input → update → render.

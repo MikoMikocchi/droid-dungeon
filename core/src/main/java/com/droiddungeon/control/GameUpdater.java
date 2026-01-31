@@ -2,8 +2,8 @@ package com.droiddungeon.control;
 
 import com.badlogic.gdx.math.Vector2;
 import com.droiddungeon.config.GameConfig;
-import com.droiddungeon.input.InputFrame;
 import com.droiddungeon.input.HeldMovementController;
+import com.droiddungeon.input.InputFrame;
 import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;

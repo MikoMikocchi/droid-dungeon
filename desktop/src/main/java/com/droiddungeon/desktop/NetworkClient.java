@@ -1,5 +1,12 @@
 package com.droiddungeon.desktop;
 
+import java.net.URI;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.net.NetworkClientAdapter;
@@ -11,12 +18,6 @@ import com.droiddungeon.net.dto.WorldSnapshotDto;
 import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 import com.google.gson.Gson;
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
-
-import java.net.URI;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class NetworkClient extends WebSocketClient implements NetworkClientAdapter {
     private final Gson gson = new Gson();

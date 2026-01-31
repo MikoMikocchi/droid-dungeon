@@ -2,8 +2,8 @@ package com.droiddungeon.net;
 
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
-import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 import com.droiddungeon.net.dto.WorldSnapshotDto;
+import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 
 /**
  * Client-side network transport abstraction used by GameRuntime in network mode.
