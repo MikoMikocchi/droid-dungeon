@@ -48,6 +48,61 @@ public final class EnemySystem {
         spawnedRooms.clear();
     }
 
+    /**
+     * Replace or update enemies from authoritative snapshot (network mode).
+     */
+    public void applySnapshot(com.droiddungeon.net.dto.EnemySnapshotDto[] addsOrUpdates, int[] removals, boolean full) {
+        if (full) {
+            enemies.clear();
+        }
+        if (removals != null && removals.length > 0) {
+            for (int id : removals) {
+                removeEnemy(id);
+            }
+        }
+        if (addsOrUpdates != null) {
+            for (com.droiddungeon.net.dto.EnemySnapshotDto s : addsOrUpdates) {
+                upsertEnemy(s);
+            }
+        }
+    }
+
+    private void removeEnemy(int id) {
+        enemies.removeIf(e -> {
+            if (e.id() == id) {
+                if (entityWorld != null) {
+                    entityWorld.remove(e);
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void upsertEnemy(com.droiddungeon.net.dto.EnemySnapshotDto s) {
+        removeEnemy(s.id());
+        EnemyType type;
+        try {
+            type = EnemyType.valueOf(s.enemyType());
+        } catch (IllegalArgumentException ex) {
+            return;
+        }
+        Enemy enemy = new Enemy(
+                s.id(),
+                type,
+                s.gridX(),
+                s.gridY(),
+                s.gridX() - 5,
+                s.gridY() - 5,
+                s.gridX() + 5,
+                s.gridY() + 5
+        );
+        enemies.add(enemy);
+        if (entityWorld != null) {
+            entityWorld.add(enemy);
+        }
+    }
+
     public void update(float deltaSeconds, Player player, PlayerStats playerStats, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
         if (player == null || playerStats == null) {
             return;

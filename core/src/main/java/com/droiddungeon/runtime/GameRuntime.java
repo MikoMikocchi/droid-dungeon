@@ -32,6 +32,9 @@ import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.net.NetworkClientAdapter;
 import com.droiddungeon.net.dto.BlockChangeDto;
+import com.droiddungeon.net.dto.ChunkSnapshotDto;
+import com.droiddungeon.net.dto.EnemySnapshotDto;
+import com.droiddungeon.net.dto.GroundItemSnapshotDto;
 import com.droiddungeon.net.dto.WeaponStateSnapshotDto;
 import com.droiddungeon.net.dto.WorldSnapshotDto;
 import com.droiddungeon.grid.BlockMaterial;
@@ -296,7 +299,12 @@ public final class GameRuntime {
             rebuildWorldFromSeed(snap.seed());
         }
 
+        if (snap.full()) {
+            applyChunkSnapshots(snap.chunks());
+        }
         applyBlockChanges(snap.blockChanges());
+        applyGroundItems(snap.groundItems(), snap.groundItemRemovals(), snap.full());
+        applyEnemies(snap.enemies(), snap.enemyRemovals(), snap.full());
 
         String myId = playerId;
         if (snap.players() != null) {
@@ -360,6 +368,36 @@ public final class GameRuntime {
                 // unknown material id
             }
         }
+    }
+
+    private void applyChunkSnapshots(ChunkSnapshotDto[] chunks) {
+        if (chunks == null) {
+            return;
+        }
+        for (ChunkSnapshotDto chunk : chunks) {
+            applyBlockChanges(chunk.blocks());
+        }
+    }
+
+    private void applyGroundItems(GroundItemSnapshotDto[] items, int[] removals, boolean full) {
+        if (full) {
+            inventorySystem.clearGroundItems();
+        }
+        if (removals != null) {
+            for (int id : removals) {
+                inventorySystem.removeGroundItem(id);
+            }
+        }
+        if (items != null) {
+            for (GroundItemSnapshotDto gi : items) {
+                ItemStack stack = new ItemStack(gi.itemId(), gi.count(), gi.durability());
+                inventorySystem.upsertGroundItem(gi.id(), gi.x(), gi.y(), stack);
+            }
+        }
+    }
+
+    private void applyEnemies(EnemySnapshotDto[] enemies, int[] removals, boolean full) {
+        enemySystem.applySnapshot(enemies, removals, full);
     }
 
     private void restartRun() {

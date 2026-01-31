@@ -10,6 +10,7 @@ import scala.jdk.CollectionConverters.*
 
 import com.droiddungeon.input.{InputFrame, MovementIntent, WeaponInput}
 import com.droiddungeon.runtime.GameContext
+import com.droiddungeon.items.GroundItem
 import com.droiddungeon.server.JsonProtocol.given
 
 object GameWorldActor {
@@ -18,13 +19,14 @@ object GameWorldActor {
   final case class UnregisterSession(ref: ActorRef[WorldSnapshot]) extends Command
   final case class ApplyInput(input: ClientInput) extends Command
   private case object Tick extends Command
+  private val KeyframeEvery = 20 // every ~1s at 50ms tick
 
   private case class BlockState(materialId: String, hp: Float)
 
   def apply(loop: ServerGameLoop): Behavior[Command] =
     Behaviors.withTimers { timers =>
-      timers.startTimerAtFixedRate(Tick, 16.millis)
-      active(loop, Map.empty, Map.empty, 0L, Map.empty)
+      timers.startTimerAtFixedRate(Tick, 50.millis)
+      active(loop, Map.empty, Map.empty, 0L, Map.empty, Map.empty, Map.empty)
     }
 
   private def active(
@@ -32,35 +34,42 @@ object GameWorldActor {
       sessions: Map[String, ActorRef[WorldSnapshot]],
       pendingInputs: Map[String, ClientInput],
       tick: Long,
-      blockCache: Map[(Int, Int), BlockState]
+      blockCache: Map[(Int, Int), BlockState],
+      prevEnemies: Map[Int, EnemySnapshot],
+      prevGround: Map[Int, GroundItemSnapshot]
   ): Behavior[Command] =
     Behaviors.receive { (ctx, msg) =>
       msg match {
         case RegisterSession(playerId, ref) =>
           val newSessions = sessions + (playerId -> ref)
           ctx.log.info("Session registered {} as player {}", ref, playerId)
-          ref ! snapshot(loop, newSessions.keySet, tick, Seq.empty)
-          active(loop, newSessions, pendingInputs, tick, blockCache)
+          ref ! snapshot(loop, newSessions.keySet, tick, Seq.empty, full = true, Map.empty, Map.empty)
+          active(loop, newSessions, pendingInputs, tick, blockCache, prevEnemies, prevGround)
 
         case UnregisterSession(ref) =>
           val filtered = sessions.filterNot { case (_, r) => r == ref }
           ctx.log.info("Session unregistered {}", ref)
           val filteredInputs = pendingInputs.filter { case (pid, _) => filtered.contains(pid) }
-          active(loop, filtered, filteredInputs, tick, blockCache)
+          active(loop, filtered, filteredInputs, tick, blockCache, prevEnemies, prevGround)
 
         case ApplyInput(input) =>
-          active(loop, sessions, pendingInputs + (input.playerId -> input), tick, blockCache)
+          active(loop, sessions, pendingInputs + (input.playerId -> input), tick, blockCache, prevEnemies, prevGround)
 
         case Tick =>
           pendingInputs.values.foreach { in =>
             val frame = toInputFrame(in)
-            loop.tick(frame, 0.016f)
+            loop.tick(frame, 0.05f)
           }
+          val nextTick = tick + 1
+          val forceFull = nextTick % KeyframeEvery == 0
+          val baseCache = if (forceFull) Map.empty[(Int, Int), BlockState] else blockCache
           val (blockChanges, updatedCache) =
-            collectBlockChanges(loop.context(), blockCache, radius = 12)
-          val snap = snapshot(loop, sessions.keySet, tick + 1, blockChanges)
+            collectBlockChanges(loop.context(), baseCache, radius = 8)
+          val snap = snapshot(loop, sessions.keySet, nextTick, blockChanges, full = forceFull, prevEnemies, prevGround)
           sessions.values.foreach(_ ! snap)
-          active(loop, sessions, Map.empty, tick + 1, updatedCache)
+          val nextEnemies = snap.enemies.map(e => e.id -> e).toMap
+          val nextGround   = snap.groundItems.map(g => g.id -> g).toMap
+          active(loop, sessions, Map.empty, nextTick, updatedCache, nextEnemies, nextGround)
       }
     }
 
@@ -85,18 +94,31 @@ object GameWorldActor {
       loop: ServerGameLoop,
       playerIds: Iterable[String],
       tick: Long,
-      blockChanges: Seq[BlockChange]
+      blockChanges: Seq[BlockChange],
+      full: Boolean,
+      prevEnemies: Map[Int, EnemySnapshot],
+      prevGround: Map[Int, GroundItemSnapshot]
   ): WorldSnapshot = {
     val ctx = loop.context()
-    val enemies = ctx.enemySystem().getEnemies().asScala.toSeq.map { e =>
+    val enemiesAll = ctx.enemySystem().getEnemies().asScala.toSeq.map { e =>
       EnemySnapshot(e.id(), e.getType.toString, e.getRenderX, e.getRenderY, e.getGridX, e.getGridY, e.getHealth)
     }
+    val groundAll = collectGroundItems(ctx, ctx.player().getGridX, ctx.player().getGridY, radius = 20)
+    val (enemiesToSend, enemyRemovals) =
+      if (full) (enemiesAll, Seq.empty[Int])
+      else diffEnemies(enemiesAll, prevEnemies)
+    val (groundToSend, groundRemovals) =
+      if (full) (groundAll, Seq.empty[Int])
+      else diffGround(groundAll, prevGround)
+    val chunks = if (full) collectChunks(ctx, chunkRadius = 2) else Seq.empty
     val weaponState = ctx.weaponSystem().getState()
     val miningTargetOpt = Option(ctx.miningSystem().getTarget())
     WorldSnapshot(
       tick = tick,
       seed = loop.worldSeed(),
       version = "0.1",
+      full = full,
+      chunks = chunks,
       players = playerIds.toSeq.map { id =>
         PlayerSnapshot(
           id,
@@ -107,9 +129,11 @@ object GameWorldActor {
           ctx.playerStats().getHealth()
         )
       },
-      enemies = enemies,
+      enemies = enemiesToSend,
+      enemyRemovals = enemyRemovals,
       blockChanges = blockChanges,
-      groundItems = Seq.empty,
+      groundItems = groundToSend,
+      groundItemRemovals = groundRemovals,
       weaponStates = playerIds.toSeq.map { id =>
         WeaponStateSnapshot(id, weaponState.swinging(), weaponState.swingProgress(), weaponState.aimAngleRad())
       },
@@ -145,5 +169,62 @@ object GameWorldActor {
       updated = updated + (key -> BlockState(materialId, hp))
     }
     (buffer.toSeq, updated)
+  }
+
+  private def collectGroundItems(ctx: GameContext, centerX: Int, centerY: Int, radius: Int): Seq[GroundItemSnapshot] = {
+    val r2 = radius * radius
+      ctx.inventorySystem().getGroundItems().asScala.toSeq
+      .filter { g =>
+        val dx = g.getGridX - centerX
+        val dy = g.getGridY - centerY
+        dx * dx + dy * dy <= r2
+      }
+      .map { g =>
+        val stack = g.getStack
+        GroundItemSnapshot(g.id(), g.getGridX, g.getGridY, stack.itemId(), stack.count(), stack.durability())
+      }
+  }
+
+  private def diffEnemies(current: Seq[EnemySnapshot], previous: Map[Int, EnemySnapshot]): (Seq[EnemySnapshot], Seq[Int]) = {
+    val currentMap = current.map(e => e.id -> e).toMap
+    val changed = current.filter(e => previous.get(e.id).forall(prev => prev != e))
+    val removed = previous.keySet.diff(currentMap.keySet).toSeq
+    (changed, removed)
+  }
+
+  private def diffGround(current: Seq[GroundItemSnapshot], previous: Map[Int, GroundItemSnapshot]): (Seq[GroundItemSnapshot], Seq[Int]) = {
+    val currentMap = current.map(g => g.id -> g).toMap
+    val changed = current.filter(g => previous.get(g.id).forall(prev => prev != g))
+    val removed = previous.keySet.diff(currentMap.keySet).toSeq
+    (changed, removed)
+  }
+
+  private def collectChunks(ctx: GameContext, chunkRadius: Int): Seq[ChunkSnapshot] = {
+    val grid = ctx.grid()
+    val chunkSize = grid.getChunkSize()
+    val pcx = Math.floorDiv(ctx.player().getGridX, chunkSize)
+    val pcy = Math.floorDiv(ctx.player().getGridY, chunkSize)
+    val chunks = mutable.ArrayBuffer.empty[ChunkSnapshot]
+    for {
+      cx <- (pcx - chunkRadius) to (pcx + chunkRadius)
+      cy <- (pcy - chunkRadius) to (pcy + chunkRadius)
+    } {
+      val blocks = mutable.ArrayBuffer.empty[BlockChange]
+      val originX = cx * chunkSize
+      val originY = cy * chunkSize
+      for {
+        lx <- 0 until chunkSize
+        ly <- 0 until chunkSize
+      } {
+        val x = originX + lx
+        val y = originY + ly
+        val material = grid.getBlockMaterial(x, y)
+        val materialId = Option(material).map(_.name()).getOrElse("")
+        val hp = grid.getBlockHealth(x, y)
+        blocks += BlockChange(x, y, materialId, hp)
+      }
+      chunks += ChunkSnapshot(cx, cy, blocks.toSeq)
+    }
+    chunks.toSeq
   }
 }

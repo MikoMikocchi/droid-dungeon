@@ -356,6 +356,28 @@ public final class InventorySystem {
         return groundItems;
     }
 
+    public void removeGroundItem(int id) {
+        groundItems.removeIf(gi -> {
+            if (gi.id() == id) {
+                if (entityWorld != null) {
+                    entityWorld.remove(gi);
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    public void upsertGroundItem(int id, int x, int y, ItemStack stack) {
+        if (stack == null) return;
+        removeGroundItem(id);
+        GroundItem newItem = new GroundItem(id, x, y, stack);
+        groundItems.add(newItem);
+        if (entityWorld != null) {
+            entityWorld.add(newItem);
+        }
+    }
+
     public void clearGroundItems() {
         if (entityWorld != null) {
             for (GroundItem groundItem : groundItems) {
