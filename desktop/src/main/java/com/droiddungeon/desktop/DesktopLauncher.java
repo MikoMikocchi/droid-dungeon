@@ -20,7 +20,6 @@ public class DesktopLauncher {
                 0             // samples (no MSAA)
         );
 
-        @SuppressWarnings("unused")
         boolean network = Boolean.parseBoolean(System.getProperty("network", "false"));
         NetworkSnapshotBuffer buffer = new NetworkSnapshotBuffer();
         com.droiddungeon.net.NetworkClientAdapter netClient = null;
@@ -29,6 +28,7 @@ public class DesktopLauncher {
             var uri = java.net.URI.create("ws://" + System.getProperty("network.host", "localhost") + ":" + port + "/ws");
             netClient = new NetworkClient(uri, buffer);
         }
+        @SuppressWarnings("unused")
         Lwjgl3Application app = new Lwjgl3Application(
                 new DroidDungeonGame(new GdxTextureLoader(), new DesktopAssets(), netClient, buffer, network),
                 config
