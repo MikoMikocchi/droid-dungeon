@@ -1,3 +1,3 @@
 rootProject.name = "droid-dungeon"
 
-include("core", "desktop")
+include("core", "desktop", "server")
