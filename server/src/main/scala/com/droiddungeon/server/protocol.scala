@@ -31,7 +31,22 @@ final case class ClientInput(
 )
 
 final case class PlayerSnapshot(playerId: String, x: Float, y: Float, gridX: Int, gridY: Int, hp: Float)
-final case class WorldSnapshot(tick: Long, players: Seq[PlayerSnapshot])
+final case class EnemySnapshot(id: Int, enemyType: String, x: Float, y: Float, gridX: Int, gridY: Int, hp: Float)
+final case class BlockChange(x: Int, y: Int, materialId: String, blockHp: Float)
+final case class GroundItemSnapshot(x: Int, y: Int, itemId: String, count: Int, durability: Int)
+final case class WeaponStateSnapshot(playerId: String, swinging: Boolean, swingProgress: Float, aimAngleRad: Float)
+final case class MiningStateSnapshot(playerId: String, targetX: Int, targetY: Int, progress: Float)
+final case class WorldSnapshot(
+    tick: Long,
+    seed: Long,
+    version: String,
+    players: Seq[PlayerSnapshot],
+    enemies: Seq[EnemySnapshot],
+    blockChanges: Seq[BlockChange],
+    groundItems: Seq[GroundItemSnapshot],
+    weaponStates: Seq[WeaponStateSnapshot],
+    miningStates: Seq[MiningStateSnapshot]
+)
 final case class Welcome(playerId: String)
 
 object JsonProtocol extends DefaultJsonProtocol {
@@ -39,6 +54,11 @@ object JsonProtocol extends DefaultJsonProtocol {
   given weaponFmt: RootJsonFormat[WeaponInputDto]     = jsonFormat4(WeaponInputDto.apply)
   given clientFmt: RootJsonFormat[ClientInput]        = jsonFormat7(ClientInput.apply)
   given playerFmt: RootJsonFormat[PlayerSnapshot]     = jsonFormat6(PlayerSnapshot.apply)
-  given worldFmt: RootJsonFormat[WorldSnapshot]       = jsonFormat2(WorldSnapshot.apply)
+  given enemyFmt: RootJsonFormat[EnemySnapshot]       = jsonFormat7(EnemySnapshot.apply)
+  given blockFmt: RootJsonFormat[BlockChange]         = jsonFormat4(BlockChange.apply)
+  given groundFmt: RootJsonFormat[GroundItemSnapshot] = jsonFormat5(GroundItemSnapshot.apply)
+  given weaponStateFmt: RootJsonFormat[WeaponStateSnapshot] = jsonFormat4(WeaponStateSnapshot.apply)
+  given miningStateFmt: RootJsonFormat[MiningStateSnapshot] = jsonFormat4(MiningStateSnapshot.apply)
+  given worldFmt: RootJsonFormat[WorldSnapshot]       = jsonFormat9(WorldSnapshot.apply)
   given welcomeFmt: RootJsonFormat[Welcome]           = jsonFormat1(Welcome.apply)
 }
