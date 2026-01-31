@@ -8,6 +8,7 @@ import com.droiddungeon.render.WorldRenderer;
 import com.droiddungeon.render.effects.ScreenEffectRenderer;
 import com.droiddungeon.render.effects.VignetteEffect;
 import com.droiddungeon.render.lighting.LightingSystem;
+import com.droiddungeon.render.ClientAssets;
 import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.ui.DebugOverlay;
@@ -30,11 +31,11 @@ public final class GameRenderCoordinator {
     // Toggled with F3
     private boolean debugVisible = false;
 
-    public GameRenderCoordinator() {
-        worldRenderer = new WorldRenderer();
-        hudRenderer = new HudRenderer();
+    public GameRenderCoordinator(ClientAssets assets) {
+        worldRenderer = new WorldRenderer(assets);
+        hudRenderer = new HudRenderer(assets);
         minimapRenderer = new MinimapRenderer();
-        debugOverlay = new DebugOverlay();
+        debugOverlay = new DebugOverlay(assets);
         screenEffectRenderer = new ScreenEffectRenderer();
         // Reduce vignette intensity since we have proper lighting now
         VignetteEffect vignette = new VignetteEffect();

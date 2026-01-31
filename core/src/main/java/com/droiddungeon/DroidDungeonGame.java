@@ -6,10 +6,21 @@ import com.droiddungeon.runtime.GameRuntime;
 
 public class DroidDungeonGame extends ApplicationAdapter {
     private GameRuntime runtime;
+    private final com.droiddungeon.items.TextureLoader textureLoader;
+    private final com.droiddungeon.render.ClientAssets clientAssets;
+
+    public DroidDungeonGame(com.droiddungeon.items.TextureLoader textureLoader, com.droiddungeon.render.ClientAssets clientAssets) {
+        this.textureLoader = textureLoader;
+        this.clientAssets = clientAssets;
+    }
+
+    public DroidDungeonGame() {
+        this(null, null);
+    }
 
     @Override
     public void create() {
-        runtime = new GameRuntime(GameConfig.defaults());
+        runtime = new GameRuntime(GameConfig.defaults(), textureLoader, clientAssets);
         runtime.create();
     }
 

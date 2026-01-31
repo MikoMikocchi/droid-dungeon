@@ -20,6 +20,9 @@ public class DesktopLauncher {
         );
 
         @SuppressWarnings("unused")
-        Lwjgl3Application app = new Lwjgl3Application(new DroidDungeonGame(), config);
+        Lwjgl3Application app = new Lwjgl3Application(
+                new DroidDungeonGame(new GdxTextureLoader(), new DesktopAssets()),
+                config
+        );
     }
 }

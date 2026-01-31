@@ -26,6 +26,7 @@ import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.systems.WeaponSystem.WeaponState;
 import com.droiddungeon.systems.MiningSystem.MiningTarget;
 import com.droiddungeon.ui.MapMarker;
+import com.droiddungeon.render.ClientAssets;
 
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -43,14 +44,14 @@ public final class WorldRenderer {
     private static final Color SAFE_TINT = new Color(0.30f, 0.55f, 0.95f, 1f);
     private static final Color DANGER_TINT = new Color(0.82f, 0.25f, 0.25f, 1f);
 
-    public WorldRenderer() {
-        font = RenderAssets.font(13);
-        whiteRegion = RenderAssets.whiteRegion();
-        playerRegion = RenderAssets.playerRegion();
-        dottyRegion = RenderAssets.dottyRegion();
-        catsterRegion = RenderAssets.catsterRegion();
-        floorRegion = RenderAssets.floorRegion();
-        wallAutoTiles = RenderAssets.wallAutoTiles();
+    public WorldRenderer(ClientAssets assets) {
+        font = assets.font(13);
+        whiteRegion = assets.whiteRegion();
+        playerRegion = assets.playerRegion();
+        dottyRegion = assets.dottyRegion();
+        catsterRegion = assets.catsterRegion();
+        floorRegion = assets.floorRegion();
+        wallAutoTiles = assets.wallAutoTiles();
     }
 
     public void render(

@@ -18,7 +18,7 @@ import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.render.RenderAssets;
+import com.droiddungeon.render.ClientAssets;
 
 public final class HudRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -71,9 +71,9 @@ public final class HudRenderer {
         }
     }
 
-    public HudRenderer() {
-        font = RenderAssets.font(14);
-        whiteRegion = RenderAssets.whiteRegion();
+    public HudRenderer(ClientAssets assets) {
+        font = assets.font(14);
+        whiteRegion = assets.whiteRegion();
     }
 
     public void render(

@@ -21,7 +21,8 @@ import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.render.RenderAssets;
+import com.droiddungeon.items.TextureLoader;
+import com.droiddungeon.render.ClientAssets;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
@@ -35,6 +36,8 @@ public final class GameRuntime {
     private final GameConfig config;
     private final InputBindings inputBindings;
     private final DebugTextBuilder debugTextBuilder = new DebugTextBuilder();
+    private final com.droiddungeon.items.TextureLoader textureLoader;
+    private final ClientAssets clientAssets;
 
     private Viewport worldViewport;
     private Viewport uiViewport;
@@ -66,8 +69,14 @@ public final class GameRuntime {
     private RunStateManager runStateManager;
 
     public GameRuntime(GameConfig config) {
+        this(config, null, null);
+    }
+
+    public GameRuntime(GameConfig config, com.droiddungeon.items.TextureLoader textureLoader, ClientAssets clientAssets) {
         this.config = config;
         this.inputBindings = InputBindings.defaults();
+        this.textureLoader = textureLoader;
+        this.clientAssets = clientAssets;
     }
 
     /**
@@ -93,9 +102,12 @@ public final class GameRuntime {
         spawnX = layout.spawnX();
         spawnY = layout.spawnY();
 
-        mapOverlay = new MapOverlay(RenderAssets.font(14));
+        if (clientAssets == null) {
+            throw new IllegalStateException("ClientAssets must be provided for GameRuntime");
+        }
+        mapOverlay = new MapOverlay(clientAssets.font(14));
         movementController = new HeldMovementController();
-        renderer = new GameRenderCoordinator();
+        renderer = new GameRenderCoordinator(clientAssets);
         renderer.initLighting(config.tileSize(), worldSeed);
         inputController = new GameInputController(inputBindings, renderer.hudRenderer());
         mapController = new MapController();
@@ -103,7 +115,12 @@ public final class GameRuntime {
 
         entityWorld = new EntityWorld();
         inventory = new Inventory();
-        itemRegistry = ItemRegistry.load("items.txt");
+        if (textureLoader != null) {
+            String itemsPath = Gdx.files.internal("items.txt").file().getAbsolutePath();
+            itemRegistry = ItemRegistry.loadWithLoader(itemsPath, textureLoader);
+        } else {
+            itemRegistry = ItemRegistry.loadDataOnly(java.nio.file.Path.of("items.txt"));
+        }
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
         enemySystem = new EnemySystem(grid, worldSeed, entityWorld, inventorySystem);
         contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
@@ -171,7 +188,9 @@ public final class GameRuntime {
     public void dispose() {
         renderer.dispose();
         mapOverlay.dispose();
-        RenderAssets.dispose();
+        if (clientAssets != null) {
+            clientAssets.close();
+        }
         itemRegistry.dispose();
     }
 

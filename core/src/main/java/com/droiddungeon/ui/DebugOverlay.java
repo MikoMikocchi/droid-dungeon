@@ -7,7 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.utils.viewport.Viewport;
-import com.droiddungeon.render.RenderAssets;
+import com.droiddungeon.render.ClientAssets;
 
 /**
  * Renders debug info box (tile/entity stats).
@@ -18,8 +18,8 @@ public final class DebugOverlay {
     private final BitmapFont font;
     private final GlyphLayout glyphLayout = new GlyphLayout();
 
-    public DebugOverlay() {
-        font = RenderAssets.font(14);
+    public DebugOverlay(ClientAssets assets) {
+        font = assets.font(14);
     }
 
     public void render(Viewport viewport, String debugText) {

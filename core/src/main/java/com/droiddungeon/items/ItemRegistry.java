@@ -10,31 +10,32 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStackSizer;
 
 public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     private final Map<String, ItemDefinition> definitions = new HashMap<>();
-    private final List<Texture> ownedTextures = new ArrayList<>();
+    private final TextureLoader textureLoader;
 
     private final int fallbackMaxStack;
 
     public ItemRegistry() {
-        this(Inventory.DEFAULT_MAX_STACK);
+        this(null, Inventory.DEFAULT_MAX_STACK);
     }
 
-    public ItemRegistry(int fallbackMaxStack) {
+    public ItemRegistry(TextureLoader textureLoader, int fallbackMaxStack) {
+        this.textureLoader = textureLoader;
         this.fallbackMaxStack = fallbackMaxStack;
     }
 
     public static ItemRegistry load(String path) {
-        ItemRegistry registry = new ItemRegistry();
-        registry.loadFromFile(path);
+        return loadWithLoader(path, null);
+    }
+
+    public static ItemRegistry loadWithLoader(String path, TextureLoader loader) {
+        ItemRegistry registry = new ItemRegistry(loader, Inventory.DEFAULT_MAX_STACK);
+        registry.loadFromFile(path, loader != null);
         return registry;
     }
 
@@ -52,18 +53,15 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     }
 
     public static ItemRegistry loadDataOnly(List<String> lines) {
-        ItemRegistry registry = new ItemRegistry();
+        ItemRegistry registry = new ItemRegistry(null, Inventory.DEFAULT_MAX_STACK);
         registry.loadFromLines(lines, false);
         return registry;
     }
 
-    public void loadFromFile(String path) {
-        FileHandle handle = Gdx.files.internal(path);
-        if (!handle.exists()) {
-            throw new IllegalStateException("Items file not found: " + path);
-        }
-        String[] lines = handle.readString(StandardCharsets.UTF_8.name()).split("\\R");
-        loadFromLines(Arrays.asList(lines), true);
+    public void loadFromFile(String path, boolean loadTextures) {
+        String content = readAll(path);
+        String[] lines = content.split("\\R");
+        loadFromLines(Arrays.asList(lines), loadTextures);
     }
 
     public void loadFromLines(List<String> lines, boolean loadTextures) {
@@ -117,15 +115,9 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
                 logInfo("Skipping duplicate item id: " + id);
                 continue;
             }
-            TextureRegion region;
-            if (loadTextures) {
-                Texture texture = new Texture(Gdx.files.internal(texturePath));
-                texture.setFilter(TextureFilter.Nearest, TextureFilter.Nearest);
-                ownedTextures.add(texture);
-                region = new TextureRegion(texture);
-            } else {
-                region = new TextureRegion(); // placeholder, no GL calls
-            }
+            TextureRegion region = (loadTextures && textureLoader != null)
+                    ? textureLoader.load(texturePath)
+                    : new TextureRegion(); // placeholder, no GL calls
             definitions.put(id, new ItemDefinition(id, displayName, maxStack, region, equippable, maxDurability, toolType));
         }
     }
@@ -163,10 +155,9 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     }
 
     public void dispose() {
-        for (Texture texture : ownedTextures) {
-            texture.dispose();
+        if (textureLoader != null) {
+            textureLoader.close();
         }
-        ownedTextures.clear();
     }
 
     @Override
@@ -175,18 +166,18 @@ public final class ItemRegistry implements ItemStackSizer, AutoCloseable {
     }
 
     private void logError(String message) {
-        if (Gdx.app != null) {
-            Gdx.app.error("ItemRegistry", message);
-        } else {
-            System.err.println("ItemRegistry ERROR: " + message);
-        }
+        System.err.println("ItemRegistry ERROR: " + message);
     }
 
     private void logInfo(String message) {
-        if (Gdx.app != null) {
-            Gdx.app.log("ItemRegistry", message);
-        } else {
-            System.out.println("ItemRegistry: " + message);
+        System.out.println("ItemRegistry: " + message);
+    }
+
+    private String readAll(String path) {
+        try {
+            return Files.readString(Path.of(path), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("Items file not found: " + path, e);
         }
     }
 }
