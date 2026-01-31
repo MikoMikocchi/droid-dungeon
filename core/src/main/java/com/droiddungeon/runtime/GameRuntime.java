@@ -31,6 +31,10 @@ import com.droiddungeon.ui.MapOverlay;
 import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.net.NetworkClientAdapter;
+import com.droiddungeon.net.dto.BlockChangeDto;
+import com.droiddungeon.net.dto.WeaponStateSnapshotDto;
+import com.droiddungeon.net.dto.WorldSnapshotDto;
+import com.droiddungeon.grid.BlockMaterial;
 
 /**
  * Thin orchestration shell: wires input → update → render.
@@ -176,6 +180,14 @@ public final class GameRuntime {
             if (networkClient != null) {
                 networkClient.connectIfNeeded();
                 if (networkClient.isConnected()) {
+                    if (networkClient.playerId() != null) {
+                        playerId = networkClient.playerId();
+                    }
+                    WorldSnapshotDto latest = networkClient.pollSnapshot();
+                    if (latest != null) {
+                        applySnapshot(latest);
+                    }
+
                     networkClient.sendInput(
                             input.movementIntent(),
                             input.weaponInput(),
@@ -246,6 +258,108 @@ public final class GameRuntime {
             clientAssets.close();
         }
         itemRegistry.dispose();
+    }
+
+    /**
+     * Rebuilds the entire runtime world from a server-provided seed so карта совпадает с авторитетной.
+     */
+    private void rebuildWorldFromSeed(long newSeed) {
+        worldSeed = newSeed;
+        worldSeedForced = true;
+
+        DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
+        Grid grid = layout.grid();
+        spawnX = layout.spawnX();
+        spawnY = layout.spawnY();
+
+        inventory = new Inventory();
+        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
+        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, inventorySystem);
+
+        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
+        context = contextFactory.createContext();
+        weaponSystem = context.weaponSystem();
+        weaponState = weaponSystem.getState();
+
+        mapOverlay.clearExplored();
+        mapOverlay.revealAround(context.player(), 10);
+        seedDemoItems();
+        runStateManager.reset(mapOverlay);
+    }
+
+    private void applySnapshot(WorldSnapshotDto snap) {
+        if (snap == null) {
+            return;
+        }
+
+        if (snap.seed() != 0L && snap.seed() != worldSeed) {
+            rebuildWorldFromSeed(snap.seed());
+        }
+
+        applyBlockChanges(snap.blockChanges());
+
+        String myId = playerId;
+        if (snap.players() != null) {
+            for (var p : snap.players()) {
+                if (myId != null && myId.equals(p.playerId())) {
+                    context.player().setServerPosition(p.x(), p.y(), p.gridX(), p.gridY());
+                    context.playerStats().setHealth(p.hp());
+                }
+            }
+        } else if (snap.player() != null) {
+            context.player().setServerPosition(
+                    snap.player().x(),
+                    snap.player().y(),
+                    snap.player().gridX(),
+                    snap.player().gridY()
+            );
+            context.playerStats().setHealth(snap.player().hp());
+        }
+
+        if (snap.weaponStates() != null && weaponState != null && myId != null) {
+            for (WeaponStateSnapshotDto ws : snap.weaponStates()) {
+                if (myId.equals(ws.playerId())) {
+                    weaponState = new WeaponSystem.WeaponState(
+                            weaponState.active(),
+                            ws.swinging(),
+                            ws.aimAngleRad(),
+                            weaponState.arcRad(),
+                            weaponState.reachTiles(),
+                            weaponState.innerHoleTiles(),
+                            ws.swingProgress(),
+                            weaponState.cooldownRatio(),
+                            weaponState.damage(),
+                            weaponState.swingIndex()
+                    );
+                }
+            }
+        }
+    }
+
+    private void applyBlockChanges(BlockChangeDto[] changes) {
+        if (changes == null || changes.length == 0) {
+            return;
+        }
+        Grid grid = context.grid();
+        for (BlockChangeDto bc : changes) {
+            String id = bc.materialId();
+            if (id == null || id.isEmpty()) {
+                grid.setBlock(bc.x(), bc.y(), null);
+                continue;
+            }
+            try {
+                BlockMaterial mat = BlockMaterial.valueOf(id);
+                grid.setBlock(bc.x(), bc.y(), mat);
+                float desiredHp = bc.blockHp();
+                float maxHp = mat.maxHealth();
+                float damage = Math.max(0f, maxHp - desiredHp);
+                if (damage > 0f) {
+                    grid.damageBlock(bc.x(), bc.y(), damage);
+                }
+            } catch (IllegalArgumentException ignored) {
+                // unknown material id
+            }
+        }
     }
 
     private void restartRun() {

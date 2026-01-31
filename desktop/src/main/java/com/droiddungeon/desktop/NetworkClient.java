@@ -16,10 +16,12 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class NetworkClient extends WebSocketClient implements NetworkClientAdapter {
     private final Gson gson = new Gson();
     private final NetworkSnapshotBuffer buffer;
+    private final AtomicReference<WorldSnapshotDto> latestSnapshot = new AtomicReference<>();
     private volatile boolean connected = false;
     private long tickCounter = 0L;
     private boolean connectAttempted = false;
@@ -46,6 +48,7 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
             }
             WorldSnapshotDto snap = gson.fromJson(message, WorldSnapshotDto.class);
             if (snap != null) {
+                latestSnapshot.set(snap);
                 if (playerId != null && snap.players() != null) {
                     for (var p : snap.players()) {
                         if (playerId.equals(p.playerId())) {
@@ -109,6 +112,16 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
     @Override
     public NetworkSnapshotBuffer buffer() {
         return buffer;
+    }
+
+    @Override
+    public WorldSnapshotDto pollSnapshot() {
+        return latestSnapshot.getAndSet(null);
+    }
+
+    @Override
+    public String playerId() {
+        return playerId;
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.droiddungeon.net;
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.runtime.NetworkSnapshotBuffer;
+import com.droiddungeon.net.dto.WorldSnapshotDto;
 
 /**
  * Client-side network transport abstraction used by GameRuntime in network mode.
@@ -19,4 +20,10 @@ public interface NetworkClientAdapter {
 
     /** Called when disposing the game. */
     default void close() {}
+
+    /** Latest snapshot if available (optional). */
+    default WorldSnapshotDto pollSnapshot() { return null; }
+
+    /** Player id assigned by server if known. */
+    default String playerId() { return null; }
 }
