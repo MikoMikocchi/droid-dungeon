@@ -8,5 +8,7 @@ import com.droiddungeon.systems.WeaponSystem;
 public record GameUpdateResult(
         float gridOriginX,
         float gridOriginY,
-        WeaponSystem.WeaponState weaponState
+        WeaponSystem.WeaponState weaponState,
+        int pendingInputsCount,
+        long lastProcessedTick
 ) {}

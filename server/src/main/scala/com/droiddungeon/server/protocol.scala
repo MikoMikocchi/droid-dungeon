@@ -30,7 +30,8 @@ final case class ClientInput(
     mine: Boolean
 )
 
-final case class PlayerSnapshot(playerId: String, x: Float, y: Float, gridX: Int, gridY: Int, hp: Float)
+// lastProcessedTick: server's latest applied input tick for this player (acknowledgement)
+final case class PlayerSnapshot(playerId: String, x: Float, y: Float, gridX: Int, gridY: Int, hp: Float, lastProcessedTick: Long)
 final case class EnemySnapshot(id: Int, enemyType: String, x: Float, y: Float, gridX: Int, gridY: Int, hp: Float)
 final case class BlockChange(x: Int, y: Int, materialId: String, blockHp: Float)
 final case class GroundItemSnapshot(id: Int, x: Int, y: Int, itemId: String, count: Int, durability: Int)
@@ -58,7 +59,7 @@ object JsonProtocol extends DefaultJsonProtocol {
   given movementFmt: RootJsonFormat[MovementIntentDto] = jsonFormat8(MovementIntentDto.apply)
   given weaponFmt: RootJsonFormat[WeaponInputDto]     = jsonFormat4(WeaponInputDto.apply)
   given clientFmt: RootJsonFormat[ClientInput]        = jsonFormat7(ClientInput.apply)
-  given playerFmt: RootJsonFormat[PlayerSnapshot]     = jsonFormat6(PlayerSnapshot.apply)
+  given playerFmt: RootJsonFormat[PlayerSnapshot]     = jsonFormat7(PlayerSnapshot.apply)
   given enemyFmt: RootJsonFormat[EnemySnapshot]       = jsonFormat7(EnemySnapshot.apply)
   given blockFmt: RootJsonFormat[BlockChange]         = jsonFormat4(BlockChange.apply)
   given groundFmt: RootJsonFormat[GroundItemSnapshot] = jsonFormat6(GroundItemSnapshot.apply)

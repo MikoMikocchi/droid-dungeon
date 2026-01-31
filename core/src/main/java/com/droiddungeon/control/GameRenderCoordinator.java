@@ -138,7 +138,9 @@ public final class GameRenderCoordinator {
                     update.gridOriginX(),
                     update.gridOriginY(),
                     delta,
-                    lightCount
+                    lightCount,
+                    update.pendingInputsCount(),
+                    update.lastProcessedTick()
             );
         }
 

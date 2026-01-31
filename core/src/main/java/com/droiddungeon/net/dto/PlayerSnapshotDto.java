@@ -6,5 +6,6 @@ public record PlayerSnapshotDto(
         float y,
         int gridX,
         int gridY,
-        float hp
+        float hp,
+        long lastProcessedTick
 ) {}

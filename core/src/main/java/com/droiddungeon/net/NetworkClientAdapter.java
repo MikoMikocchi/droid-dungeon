@@ -14,7 +14,7 @@ public interface NetworkClientAdapter {
 
     boolean isConnected();
 
-    void sendInput(MovementIntent movement, WeaponInput weapon, boolean drop, boolean pickUp, boolean mine, String playerId);
+    void sendInput(long tick, MovementIntent movement, WeaponInput weapon, boolean drop, boolean pickUp, boolean mine, String playerId);
 
     NetworkSnapshotBuffer buffer();
 

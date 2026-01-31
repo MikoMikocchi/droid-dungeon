@@ -32,7 +32,9 @@ public final class DebugTextBuilder {
             float gridOriginX,
             float gridOriginY,
             float delta,
-            int lightCount
+            int lightCount,
+            int pendingInputsCount,
+            long lastProcessedTick
     ) {
         float tileSize = grid.getTileSize();
         Vector2 world = worldViewport.unproject(new Vector2(Gdx.input.getX(), Gdx.input.getY()));
@@ -58,6 +60,7 @@ public final class DebugTextBuilder {
         text.append("  |  Enemies: ").append(totalEnemies);
         text.append("  |  Items: ").append(groundItemCount);
         text.append("\n\n");
+        text.append("Network: pendingInputs=").append(pendingInputsCount).append("  |  lastAck=").append(lastProcessedTick).append("\n");
 
         if (grid.isInside(tileX, tileY)) {
             appendTileInfo(grid, player, companionSystem, enemySystem, inventorySystem, itemRegistry, tileX, tileY, text);

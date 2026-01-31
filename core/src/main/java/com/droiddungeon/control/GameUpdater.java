@@ -113,6 +113,6 @@ public final class GameUpdater {
             );
         }
 
-        return new GameUpdateResult(gridOriginX, gridOriginY, weaponState);
+        return new GameUpdateResult(gridOriginX, gridOriginY, weaponState, 0, -1L);
     }
 }

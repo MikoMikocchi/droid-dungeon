@@ -11,7 +11,7 @@ A cozy sci‑fi dungeon crawler about **us** and our loyal companion **Dotty**. 
 - Infinite, chunk‑based dungeon generation
 - A sweet companion: **Dotty** follows your trail
 - Inventory, pickup/drop, and equipment basics
-- Melee combat against wandering enemies (Catsters)
+- Melee combat against wandering enemies
 - The core fantasy of building a tiny underground industry
 
 ## Run

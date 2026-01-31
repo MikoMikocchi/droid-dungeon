@@ -26,7 +26,8 @@ object GameWorldActor {
   def apply(loop: ServerGameLoop): Behavior[Command] =
     Behaviors.withTimers { timers =>
       timers.startTimerAtFixedRate(Tick, 50.millis)
-      active(loop, Map.empty, Map.empty, 0L, Map.empty, Map.empty, Map.empty)
+      // processedTicks: last applied tick per player for acking inputs
+      active(loop, Map.empty, Map.empty, 0L, Map.empty, Map.empty, Map.empty, Map.empty)
     }
 
   private def active(
@@ -36,40 +37,48 @@ object GameWorldActor {
       tick: Long,
       blockCache: Map[(Int, Int), BlockState],
       prevEnemies: Map[Int, EnemySnapshot],
-      prevGround: Map[Int, GroundItemSnapshot]
+      prevGround: Map[Int, GroundItemSnapshot],
+      processedTicks: Map[String, Long]
   ): Behavior[Command] =
     Behaviors.receive { (ctx, msg) =>
       msg match {
         case RegisterSession(playerId, ref) =>
           val newSessions = sessions + (playerId -> ref)
           ctx.log.info("Session registered {} as player {}", ref, playerId)
-          ref ! snapshot(loop, newSessions.keySet, tick, Seq.empty, full = true, Map.empty, Map.empty)
-          active(loop, newSessions, pendingInputs, tick, blockCache, prevEnemies, prevGround)
+          // initialize processed tick to -1
+          val newProcessed = processedTicks + (playerId -> -1L)
+          ref ! snapshot(loop, newSessions.keySet, tick, Seq.empty, full = true, Map.empty, Map.empty, newProcessed)
+          active(loop, newSessions, pendingInputs, tick, blockCache, prevEnemies, prevGround, newProcessed)
 
         case UnregisterSession(ref) =>
           val filtered = sessions.filterNot { case (_, r) => r == ref }
           ctx.log.info("Session unregistered {}", ref)
           val filteredInputs = pendingInputs.filter { case (pid, _) => filtered.contains(pid) }
-          active(loop, filtered, filteredInputs, tick, blockCache, prevEnemies, prevGround)
+          val filteredProcessed = processedTicks.filter { case (pid, _) => filtered.contains(pid) }
+          active(loop, filtered, filteredInputs, tick, blockCache, prevEnemies, prevGround, filteredProcessed)
 
         case ApplyInput(input) =>
-          active(loop, sessions, pendingInputs + (input.playerId -> input), tick, blockCache, prevEnemies, prevGround)
+          active(loop, sessions, pendingInputs + (input.playerId -> input), tick, blockCache, prevEnemies, prevGround, processedTicks)
 
         case Tick =>
-          pendingInputs.values.foreach { in =>
+          var newProcessed = processedTicks
+          pendingInputs.foreach { case (_, in) =>
             val frame = toInputFrame(in)
+            // apply the input to the authoritative loop
             loop.tick(frame, 0.05f)
+            // record that we've processed this player's input tick
+            newProcessed = newProcessed + (in.playerId -> in.tick)
           }
           val nextTick = tick + 1
           val forceFull = nextTick % KeyframeEvery == 0
           val baseCache = if (forceFull) Map.empty[(Int, Int), BlockState] else blockCache
           val (blockChanges, updatedCache) =
             collectBlockChanges(loop.context(), baseCache, radius = 8)
-          val snap = snapshot(loop, sessions.keySet, nextTick, blockChanges, full = forceFull, prevEnemies, prevGround)
+          val snap = snapshot(loop, sessions.keySet, nextTick, blockChanges, full = forceFull, prevEnemies, prevGround, newProcessed)
           sessions.values.foreach(_ ! snap)
           val nextEnemies = snap.enemies.map(e => e.id -> e).toMap
           val nextGround   = snap.groundItems.map(g => g.id -> g).toMap
-          active(loop, sessions, Map.empty, nextTick, updatedCache, nextEnemies, nextGround)
+          active(loop, sessions, Map.empty, nextTick, updatedCache, nextEnemies, nextGround, newProcessed)
       }
     }
 
@@ -97,7 +106,8 @@ object GameWorldActor {
       blockChanges: Seq[BlockChange],
       full: Boolean,
       prevEnemies: Map[Int, EnemySnapshot],
-      prevGround: Map[Int, GroundItemSnapshot]
+      prevGround: Map[Int, GroundItemSnapshot],
+      processedTicks: Map[String, Long]
   ): WorldSnapshot = {
     val ctx = loop.context()
     val enemiesAll = ctx.enemySystem().getEnemies().asScala.toSeq.map { e =>
@@ -126,7 +136,8 @@ object GameWorldActor {
           ctx.player().getRenderY,
           ctx.player().getGridX,
           ctx.player().getGridY,
-          ctx.playerStats().getHealth()
+          ctx.playerStats().getHealth(),
+          processedTicks.getOrElse(id, -1L)
         )
       },
       enemies = enemiesToSend,

@@ -4,38 +4,58 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
- * Maintains the two most recent snapshots for interpolation.
+ * Thread-safe buffer of recent authoritative snapshots from the server.
+ * Allows interpolation for a target server tick (fractional).
  */
 public final class NetworkSnapshotBuffer {
-    private final Deque<NetworkSnapshot> deque = new ArrayDeque<>(2);
+    private static final int DEFAULT_CAPACITY = 32;
+    private final Deque<NetworkSnapshot> deque = new ArrayDeque<>(DEFAULT_CAPACITY);
 
-    public void push(NetworkSnapshot snap) {
-        if (deque.size() == 2) {
+    public synchronized void push(NetworkSnapshot snap) {
+        if (deque.size() >= DEFAULT_CAPACITY) {
             deque.removeFirst();
         }
         deque.addLast(snap);
     }
 
+    public synchronized long latestTick() {
+        NetworkSnapshot last = deque.peekLast();
+        return last == null ? -1L : last.tick();
+    }
+
     /**
-     * Interpolates between last two snapshots based on alpha in [0,1].
-     * If only one snapshot exists, returns it.
+     * Interpolates snapshots for a fractional server tick. If exact tick is not available,
+     * the method will find surrounding snapshots and linearly interpolate between them.
      */
-    public NetworkSnapshot interpolate(float alpha) {
+    public synchronized NetworkSnapshot interpolateForTick(double targetTick) {
         if (deque.isEmpty()) return null;
-        if (deque.size() == 1 || alpha <= 0f) return deque.peekLast();
+        if (deque.size() == 1) return deque.peekLast();
 
-        var a = deque.getFirst();
-        var b = deque.getLast();
-
-        float t = Math.min(1f, Math.max(0f, alpha));
-        return new NetworkSnapshot(
-                (long) (a.tick() + (b.tick() - a.tick()) * t),
-                lerp(a.playerRenderX(), b.playerRenderX(), t),
-                lerp(a.playerRenderY(), b.playerRenderY(), t),
-                (int) Math.round(lerp(a.playerGridX(), b.playerGridX(), t)),
-                (int) Math.round(lerp(a.playerGridY(), b.playerGridY(), t)),
-                lerp(a.playerHp(), b.playerHp(), t)
-        );
+        NetworkSnapshot prev = null;
+        for (NetworkSnapshot s : deque) {
+            if (s.tick() == (long) targetTick) {
+                return s;
+            }
+            if (s.tick() > targetTick) {
+                if (prev == null) return s;
+                double t = (targetTick - prev.tick()) / (double) (s.tick() - prev.tick());
+                float tf = (float) Math.min(1.0, Math.max(0.0, t));
+                long interpTick = (long) (prev.tick() + (s.tick() - prev.tick()) * tf);
+                long interpLastProc = (long) Math.round(prev.lastProcessedTick() + (s.lastProcessedTick() - prev.lastProcessedTick()) * tf);
+                return new NetworkSnapshot(
+                        interpTick,
+                        lerp(prev.playerRenderX(), s.playerRenderX(), tf),
+                        lerp(prev.playerRenderY(), s.playerRenderY(), tf),
+                        (int) Math.round(lerp(prev.playerGridX(), s.playerGridX(), tf)),
+                        (int) Math.round(lerp(prev.playerGridY(), s.playerGridY(), tf)),
+                        lerp(prev.playerHp(), s.playerHp(), tf),
+                        interpLastProc
+                );
+            }
+            prev = s;
+        }
+        // targetTick is after last snapshot, clamp to last
+        return deque.peekLast();
     }
 
     private static float lerp(float a, float b, float t) {

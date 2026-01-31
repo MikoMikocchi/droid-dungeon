@@ -9,5 +9,6 @@ public record NetworkSnapshot(
         float playerRenderY,
         int playerGridX,
         int playerGridY,
-        float playerHp
+        float playerHp,
+        long lastProcessedTick
 ) {}

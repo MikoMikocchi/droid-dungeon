@@ -70,6 +70,12 @@ public final class GameRuntime {
     private String playerId = java.util.UUID.randomUUID().toString();
     private MapOverlay mapOverlay;
 
+    // Network prediction state
+    private long clientTickCounter = 0L;
+    private final java.util.Deque<SentInput> pendingInputs = new java.util.ArrayDeque<>();
+
+    private static final record SentInput(long tick, com.droiddungeon.input.MovementIntent movement, com.droiddungeon.input.WeaponInput weapon, boolean drop, boolean pickUp, boolean mine) {}
+
     private Inventory inventory;
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
@@ -81,6 +87,9 @@ public final class GameRuntime {
     private GameContext context;
     private GameContextFactory contextFactory;
     private RunStateManager runStateManager;
+
+    // last acked server tick for this client (from server PlayerSnapshot.lastProcessedTick)
+    private long lastProcessedTickAck = -1L;
 
     public GameRuntime(GameConfig config) {
         this(config, null, null, null, new NetworkSnapshotBuffer(), false);
@@ -191,7 +200,23 @@ public final class GameRuntime {
                         applySnapshot(latest);
                     }
 
+                    // send input with monotonic tick and keep it for prediction/replay
+                    long tick = ++clientTickCounter;
+                    pendingInputs.addLast(new SentInput(
+                            tick,
+                            input.movementIntent(),
+                            input.weaponInput(),
+                            input.dropRequested(),
+                            input.pickUpRequested(),
+                            input.mineRequested()
+                    ));
+
+                    // local prediction: apply input immediately
+                    movementController.update(context.grid(), context.player(), context.entityWorld(), input.movementIntent());
+                    context.player().update(delta, config.playerSpeedTilesPerSecond());
+
                     networkClient.sendInput(
+                            tick,
                             input.movementIntent(),
                             input.weaponInput(),
                             input.dropRequested(),
@@ -199,22 +224,25 @@ public final class GameRuntime {
                             input.mineRequested(),
                             playerId
                     );
-                    NetworkSnapshot snap = snapshotBuffer.interpolate(delta * 60f); // rough alpha by FPS
-                    if (snap != null) {
-                        context.player().setServerPosition(
-                                snap.playerRenderX(),
-                                snap.playerRenderY(),
-                                snap.playerGridX(),
-                                snap.playerGridY()
-                        );
-                        context.playerStats().setHealth(snap.playerHp());
-                        context.companionSystem().updateFollowerTrail(context.player().getGridX(), context.player().getGridY());
-                        context.companionSystem().updateRender(delta);
+
+                    // Interpolate authoritative server snapshots based on server tick (avoid FPS hacks).
+                    final int interpolationDelayTicks = Integer.getInteger("network.interpDelayTicks", 2);
+                    long latestTick = snapshotBuffer.latestTick();
+                    if (latestTick >= 0) {
+                        double targetTick = (double) latestTick - interpolationDelayTicks;
+                        NetworkSnapshot snap = snapshotBuffer.interpolateForTick(targetTick);
+                        if (snap != null) {
+                            // only use server position for non-local smoothing—local player uses reconciliation
+                            // but we keep health and companion updates authoritative
+                            context.playerStats().setHealth(snap.playerHp());
+                            context.companionSystem().updateFollowerTrail(context.player().getGridX(), context.player().getGridY());
+                            context.companionSystem().updateRender(delta);
+                        }
                     }
                     cameraController.update(context.grid(), context.player(), delta);
                     float gridOriginX = cameraController.getGridOriginX();
                     float gridOriginY = cameraController.getGridOriginY();
-                    GameUpdateResult netResult = new GameUpdateResult(gridOriginX, gridOriginY, weaponState);
+                    GameUpdateResult netResult = new GameUpdateResult(gridOriginX, gridOriginY, weaponState, pendingInputs.size(), lastProcessedTickAck);
                     renderer.render(worldViewport, uiViewport, context, netResult, mapOverlay, debugTextBuilder, input, delta, runStateManager.isDead(), mapOpen);
                     return;
                 }
@@ -310,18 +338,12 @@ public final class GameRuntime {
         if (snap.players() != null) {
             for (var p : snap.players()) {
                 if (myId != null && myId.equals(p.playerId())) {
-                    context.player().setServerPosition(p.x(), p.y(), p.gridX(), p.gridY());
-                    context.playerStats().setHealth(p.hp());
+                    // reconcile client prediction with authoritative server state
+                    reconcilePlayerFromServer(p.lastProcessedTick(), p.x(), p.y(), p.gridX(), p.gridY(), p.hp());
                 }
             }
         } else if (snap.player() != null) {
-            context.player().setServerPosition(
-                    snap.player().x(),
-                    snap.player().y(),
-                    snap.player().gridX(),
-                    snap.player().gridY()
-            );
-            context.playerStats().setHealth(snap.player().hp());
+            reconcilePlayerFromServer(snap.player().lastProcessedTick(), snap.player().x(), snap.player().y(), snap.player().gridX(), snap.player().gridY(), snap.player().hp());
         }
 
         if (snap.weaponStates() != null && weaponState != null && myId != null) {
@@ -398,6 +420,61 @@ public final class GameRuntime {
 
     private void applyEnemies(EnemySnapshotDto[] enemies, int[] removals, boolean full) {
         enemySystem.applySnapshot(enemies, removals, full);
+    }
+
+    private void reconcilePlayerFromServer(long lastProcessedTick, float serverX, float serverY, int serverGridX, int serverGridY, float serverHp) {
+        // remove acknowledged inputs
+        while (!pendingInputs.isEmpty() && pendingInputs.peekFirst().tick() <= lastProcessedTick) {
+            pendingInputs.removeFirst();
+        }
+        lastProcessedTickAck = lastProcessedTick;
+
+        // compute distance between authoritative pos and local predicted pos
+        float dx = context.player().getRenderX() - serverX;
+        float dy = context.player().getRenderY() - serverY;
+        float dist2 = dx * dx + dy * dy;
+        float snapThreshold2 = 1.5f * 1.5f; // if >1.5 tiles, snap and replay
+
+        if (dist2 > snapThreshold2) {
+            // hard correction: set authoritative state then replay remaining inputs
+            context.player().setServerPosition(serverX, serverY, serverGridX, serverGridY);
+            context.playerStats().setHealth(serverHp);
+
+            // ensure player is not mid-move
+            context.player().update(0f, config.playerSpeedTilesPerSecond());
+
+            float serverDt = Float.parseFloat(System.getProperty("network.serverTickDt", "0.05"));
+            var it = pendingInputs.iterator();
+            java.util.List<SentInput> toReplay = new java.util.ArrayList<>();
+            while (it.hasNext()) {
+                toReplay.add(it.next());
+            }
+            for (SentInput s : toReplay) {
+                movementController.update(context.grid(), context.player(), context.entityWorld(), s.movement());
+                context.player().update(serverDt, config.playerSpeedTilesPerSecond());
+                // update weapon state locally as well
+                float gridOriginX = cameraController.getGridOriginX();
+                float gridOriginY = cameraController.getGridOriginY();
+                weaponState = weaponSystem.update(
+                        serverDt,
+                        context.player(),
+                        context.inventorySystem().getEquippedStack(),
+                        s.weapon(),
+                        gridOriginX,
+                        gridOriginY,
+                        context.grid().getTileSize(),
+                        context.inventorySystem().isInventoryOpen(),
+                        false
+                );
+            }
+        } else {
+            // small deviation: smooth correction (lerp render position towards server over a few frames)
+            float blend = 0.5f; // immediate small smoothing
+            float newRenderX = context.player().getRenderX() + (serverX - context.player().getRenderX()) * blend;
+            float newRenderY = context.player().getRenderY() + (serverY - context.player().getRenderY()) * blend;
+            context.player().setServerPosition(newRenderX, newRenderY, serverGridX, serverGridY);
+            context.playerStats().setHealth(serverHp);
+        }
     }
 
     private void restartRun() {

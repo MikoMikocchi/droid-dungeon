@@ -58,7 +58,8 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
                                     p.y(),
                                     p.gridX(),
                                     p.gridY(),
-                                    p.hp()
+                                    p.hp(),
+                                    p.lastProcessedTick()
                             ));
                             return;
                         }
@@ -71,7 +72,8 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
                             snap.player().y(),
                             snap.player().gridX(),
                             snap.player().gridY(),
-                            snap.player().hp()
+                            snap.player().hp(),
+                            snap.player().lastProcessedTick()
                     ));
                 }
             }
@@ -96,7 +98,7 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
     public boolean isConnected() { return connected; }
 
     @Override
-    public void sendInput(MovementIntent movement, WeaponInput weapon, boolean drop, boolean pickUp, boolean mine, String playerId) {
+    public void sendInput(long tick, MovementIntent movement, WeaponInput weapon, boolean drop, boolean pickUp, boolean mine, String playerId) {
         if (!connected) return;
         String pid = playerId != null ? playerId : this.playerId;
         if (pid == null) return;
@@ -105,7 +107,8 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
                 movement.leftJustPressed(), movement.rightJustPressed(), movement.upJustPressed(), movement.downJustPressed()
         );
         WeaponInputDto w = new WeaponInputDto(weapon.attackJustPressed(), weapon.attackHeld(), weapon.aimWorldX(), weapon.aimWorldY());
-        ClientInputDto dto = new ClientInputDto(tickCounter++, pid, m, w, drop, pickUp, mine);
+        ClientInputDto dto = new ClientInputDto(tick, pid, m, w, drop, pickUp, mine);
+        tickCounter = Math.max(tickCounter, tick + 1);
         send(gson.toJson(dto));
     }
 
