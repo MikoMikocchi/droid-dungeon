@@ -8,19 +8,25 @@ public class DroidDungeonGame extends ApplicationAdapter {
     private GameRuntime runtime;
     private final com.droiddungeon.items.TextureLoader textureLoader;
     private final com.droiddungeon.render.ClientAssets clientAssets;
+    private final com.droiddungeon.net.NetworkClientAdapter networkClient;
+    private final com.droiddungeon.runtime.NetworkSnapshotBuffer snapshotBuffer;
+    private final boolean networkMode;
 
-    public DroidDungeonGame(com.droiddungeon.items.TextureLoader textureLoader, com.droiddungeon.render.ClientAssets clientAssets) {
+    public DroidDungeonGame(com.droiddungeon.items.TextureLoader textureLoader, com.droiddungeon.render.ClientAssets clientAssets, com.droiddungeon.net.NetworkClientAdapter networkClient, com.droiddungeon.runtime.NetworkSnapshotBuffer buffer, boolean networkMode) {
         this.textureLoader = textureLoader;
         this.clientAssets = clientAssets;
+        this.networkClient = networkClient;
+        this.snapshotBuffer = buffer;
+        this.networkMode = networkMode;
     }
 
     public DroidDungeonGame() {
-        this(null, null);
+        this(null, null, null, new com.droiddungeon.runtime.NetworkSnapshotBuffer(), false);
     }
 
     @Override
     public void create() {
-        runtime = new GameRuntime(GameConfig.defaults(), textureLoader, clientAssets);
+        runtime = new GameRuntime(GameConfig.defaults(), textureLoader, clientAssets, networkClient, snapshotBuffer, networkMode);
         runtime.create();
     }
 

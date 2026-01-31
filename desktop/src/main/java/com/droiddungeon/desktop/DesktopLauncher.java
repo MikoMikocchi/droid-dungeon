@@ -3,6 +3,7 @@ package com.droiddungeon.desktop;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.droiddungeon.DroidDungeonGame;
+import com.droiddungeon.runtime.NetworkSnapshotBuffer;
 
 public class DesktopLauncher {
     public static void main(String[] args) {
@@ -20,8 +21,16 @@ public class DesktopLauncher {
         );
 
         @SuppressWarnings("unused")
+        boolean network = Boolean.parseBoolean(System.getProperty("network", "false"));
+        NetworkSnapshotBuffer buffer = new NetworkSnapshotBuffer();
+        com.droiddungeon.net.NetworkClientAdapter netClient = null;
+        if (network) {
+            int port = Integer.parseInt(System.getProperty("network.port", "8080"));
+            var uri = java.net.URI.create("ws://" + System.getProperty("network.host", "localhost") + ":" + port + "/ws");
+            netClient = new NetworkClient(uri, buffer);
+        }
         Lwjgl3Application app = new Lwjgl3Application(
-                new DroidDungeonGame(new GdxTextureLoader(), new DesktopAssets()),
+                new DroidDungeonGame(new GdxTextureLoader(), new DesktopAssets(), netClient, buffer, network),
                 config
         );
     }

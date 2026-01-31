@@ -120,4 +120,14 @@ public final class Player implements RenderableEntity {
     public void tryMoveBy(int dx, int dy, Grid grid) {
         moveTo(gridX + dx, gridY + dy, grid);
     }
+
+    /**
+     * Used by networked mode to apply authoritative positions from the server.
+     */
+    public void setServerPosition(float renderX, float renderY, int gridX, int gridY) {
+        this.renderX = renderX;
+        this.renderY = renderY;
+        this.gridX = gridX;
+        this.gridY = gridY;
+    }
 }

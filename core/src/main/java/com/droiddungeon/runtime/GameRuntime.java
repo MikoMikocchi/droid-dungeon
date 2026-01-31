@@ -28,6 +28,9 @@ import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.ui.MapOverlay;
+import com.droiddungeon.runtime.NetworkSnapshotBuffer;
+import com.droiddungeon.runtime.NetworkSnapshot;
+import com.droiddungeon.net.NetworkClientAdapter;
 
 /**
  * Thin orchestration shell: wires input → update → render.
@@ -38,6 +41,9 @@ public final class GameRuntime {
     private final DebugTextBuilder debugTextBuilder = new DebugTextBuilder();
     private final com.droiddungeon.items.TextureLoader textureLoader;
     private final ClientAssets clientAssets;
+    private final boolean networkMode;
+    private final NetworkClientAdapter networkClient;
+    private final NetworkSnapshotBuffer snapshotBuffer;
 
     private Viewport worldViewport;
     private Viewport uiViewport;
@@ -54,6 +60,7 @@ public final class GameRuntime {
     private boolean worldSeedForced;
     private int spawnX;
     private int spawnY;
+    private String playerId = java.util.UUID.randomUUID().toString();
     private MapOverlay mapOverlay;
 
     private Inventory inventory;
@@ -69,14 +76,17 @@ public final class GameRuntime {
     private RunStateManager runStateManager;
 
     public GameRuntime(GameConfig config) {
-        this(config, null, null);
+        this(config, null, null, null, new NetworkSnapshotBuffer(), false);
     }
 
-    public GameRuntime(GameConfig config, com.droiddungeon.items.TextureLoader textureLoader, ClientAssets clientAssets) {
+    public GameRuntime(GameConfig config, com.droiddungeon.items.TextureLoader textureLoader, ClientAssets clientAssets, NetworkClientAdapter networkClient, NetworkSnapshotBuffer buffer, boolean networkMode) {
         this.config = config;
         this.inputBindings = InputBindings.defaults();
         this.textureLoader = textureLoader;
         this.clientAssets = clientAssets;
+        this.networkMode = networkMode;
+        this.networkClient = networkClient;
+        this.snapshotBuffer = buffer != null ? buffer : new NetworkSnapshotBuffer();
     }
 
     /**
@@ -95,7 +105,17 @@ public final class GameRuntime {
         cameraController = new CameraController(worldCamera, worldViewport, config.cameraLerp(), config.cameraZoom());
 
         if (!worldSeedForced) {
-            worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+            String seedProp = System.getProperty("network.seed");
+            if (networkMode && seedProp != null) {
+                try {
+                    worldSeed = Long.parseLong(seedProp);
+                    worldSeedForced = true;
+                } catch (NumberFormatException ignored) {
+                    worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+                }
+            } else {
+                worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+            }
         }
         DungeonGenerator.DungeonLayout layout = DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
         Grid grid = layout.grid();
@@ -151,6 +171,40 @@ public final class GameRuntime {
 
         InputFrame input = inputController.collect(uiViewport, worldViewport, inventorySystem);
         boolean mapOpen = mapController.update(input, mapOverlay, renderer.minimapBounds(), uiViewport, context);
+
+        if (networkMode) {
+            if (networkClient != null) {
+                networkClient.connectIfNeeded();
+                if (networkClient.isConnected()) {
+                    networkClient.sendInput(
+                            input.movementIntent(),
+                            input.weaponInput(),
+                            input.dropRequested(),
+                            input.pickUpRequested(),
+                            input.mineRequested(),
+                            playerId
+                    );
+                    NetworkSnapshot snap = snapshotBuffer.interpolate(delta * 60f); // rough alpha by FPS
+                    if (snap != null) {
+                        context.player().setServerPosition(
+                                snap.playerRenderX(),
+                                snap.playerRenderY(),
+                                snap.playerGridX(),
+                                snap.playerGridY()
+                        );
+                        context.playerStats().setHealth(snap.playerHp());
+                        context.companionSystem().updateFollowerTrail(context.player().getGridX(), context.player().getGridY());
+                        context.companionSystem().updateRender(delta);
+                    }
+                    cameraController.update(context.grid(), context.player(), delta);
+                    float gridOriginX = cameraController.getGridOriginX();
+                    float gridOriginY = cameraController.getGridOriginY();
+                    GameUpdateResult netResult = new GameUpdateResult(gridOriginX, gridOriginY, weaponState);
+                    renderer.render(worldViewport, uiViewport, context, netResult, mapOverlay, debugTextBuilder, input, delta, runStateManager.isDead(), mapOpen);
+                    return;
+                }
+            }
+        }
 
         GameUpdateResult updateResult = updater.update(
                 delta,
@@ -217,5 +271,8 @@ public final class GameRuntime {
             inv.add(new ItemStack("steel_pickaxe", 1, pickaxeDef.maxDurability()), itemRegistry);
         }
         context.inventorySystem().addGroundStack(context.player().getGridX() + 1, context.player().getGridY(), new ItemStack("test_chip", 5));
+    }
+    private void connectNetworkClient() {
+        // network client should be injected by desktop layer
     }
 }

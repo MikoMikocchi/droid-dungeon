@@ -39,6 +39,10 @@ public final class PlayerStats implements DamageableEntity {
         return health;
     }
 
+    public void setHealth(float health) {
+        this.health = Math.max(0f, Math.min(maxHealth, health));
+    }
+
     public float getMaxHealth() {
         return maxHealth;
     }

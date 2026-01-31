@@ -12,6 +12,7 @@ public final class DesktopRuntimeFactory {
     public static GameRuntime createDefault() {
         var textureLoader = new GdxTextureLoader();
         var clientAssets = new DesktopAssets();
-        return new GameRuntime(GameConfig.defaults(), textureLoader, clientAssets);
+        var buffer = new com.droiddungeon.runtime.NetworkSnapshotBuffer();
+        return new GameRuntime(GameConfig.defaults(), textureLoader, clientAssets, null, buffer, false);
     }
 }
