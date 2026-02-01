@@ -76,6 +76,7 @@ public final class GameRuntime {
     private Inventory inventory;
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
+    private com.droiddungeon.items.GroundItemStore groundStore;
     private EntityWorld entityWorld;
     private EnemySystem enemySystem;
 
@@ -154,9 +155,11 @@ public final class GameRuntime {
         } else {
             itemRegistry = ItemRegistry.loadDataOnly(java.nio.file.Path.of("items.txt"));
         }
-        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
-        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, inventorySystem);
-        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
+        com.droiddungeon.items.GroundItemStore gs = new com.droiddungeon.items.GroundItemStore(entityWorld, itemRegistry);
+        this.groundStore = gs;
+        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld, gs);
+        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, gs);
+        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, itemRegistry, entityWorld, enemySystem, gs);
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
         weaponState = weaponSystem.getState();
@@ -252,7 +255,8 @@ public final class GameRuntime {
                 input,
                 context,
                 context.grid().getTileSize(),
-                mapOpen
+                mapOpen,
+                !networkMode // simulate enemies locally only in non-network singleplayer
         );
         weaponState = updateResult.weaponState();
 
@@ -301,10 +305,10 @@ public final class GameRuntime {
         spawnY = layout.spawnY();
 
         inventory = new Inventory();
-        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld);
-        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, inventorySystem);
+        inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld, this.groundStore);
+        enemySystem = new EnemySystem(grid, worldSeed, entityWorld, this.groundStore);
 
-        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, inventory, inventorySystem, itemRegistry, entityWorld, enemySystem);
+        contextFactory = new GameContextFactory(config, grid, spawnX, spawnY, worldSeed, itemRegistry, entityWorld, enemySystem, this.groundStore);
         context = contextFactory.createContext();
         weaponSystem = context.weaponSystem();
         weaponState = weaponSystem.getState();

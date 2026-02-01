@@ -26,6 +26,8 @@ import java.nio.file.{Files, Paths}
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
+import scala.concurrent.duration.*
+import scala.util.Try
 
 object HttpServer:
   private def websocketFlow(world: org.apache.pekko.actor.typed.ActorRef[GameWorldActor.Command])(using system: ActorSystem[Nothing]): Flow[Message, Message, Any] =
@@ -33,8 +35,19 @@ object HttpServer:
     val playerId = java.util.UUID.randomUUID().toString
 
     val sink: Sink[Message, Any] = Flow[Message]
-      .collect { case TextMessage.Strict(txt) => txt }
-      .map(_.parseJson.convertTo[ClientInput])
+      .collect { case tm: TextMessage => tm }
+      .mapAsync(1)(_.toStrict(2.seconds).map(_.text).recover { case ex =>
+        system.log.warn("Failed to read streamed text message, ignoring: {}", ex.getMessage)
+        ""
+      })
+      .map(txt => Try(txt.parseJson.convertTo[ClientInput]))
+      .mapConcat {
+        case Success(input) =>
+          List(input.copy(playerId = playerId))
+        case Failure(ex) =>
+          system.log.warn("Invalid client input JSON, ignoring: {}", ex.getMessage)
+          Nil
+      }
       .to(Sink.foreach(input => world ! GameWorldActor.ApplyInput(input)))
 
     val snapshotSource: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]] =
@@ -76,6 +89,18 @@ object HttpServer:
 
     val worldActor = system.systemActorOf(GameWorldActor(loop), "world")
 
+    val tickRoute: Option[Route] =
+      if (sys.props.get("tick.enabled").contains("true"))
+        Some(
+          path("tick") {
+            parameter("dt".as[Double].withDefault(0.016)) { dt =>
+              worldActor ! GameWorldActor.AdvanceGlobal(dt.toFloat)
+              complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "ticked"))
+            }
+          }
+        )
+      else None
+
     val route: Route =
       concat(
         path("health") {
@@ -83,21 +108,7 @@ object HttpServer:
             complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "ok"))
           }
         },
-        path("tick") {
-          parameter("dt".as[Double].withDefault(0.016)) { dt =>
-            loop.tick(
-              InputFrame.serverFrame(
-                new MovementIntent(false, false, false, false, false, false, false, false),
-                WeaponInput.idle(),
-                false,
-                false,
-                false
-              ),
-              dt.toFloat
-            )
-            complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "ticked"))
-          }
-        },
+        tickRoute.getOrElse(reject),
         path("ws") {
           handleWebSocketMessages(websocketFlow(worldActor))
         }

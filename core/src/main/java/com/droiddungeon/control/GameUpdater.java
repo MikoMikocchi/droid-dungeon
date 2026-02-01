@@ -29,7 +29,8 @@ public final class GameUpdater {
             InputFrame input,
             GameContext ctx,
             float worldViewportTileSize,
-            boolean mapOpen
+            boolean mapOpen,
+            boolean simulateEnemies
     ) {
         float gridOriginX;
         float gridOriginY;
@@ -91,7 +92,13 @@ public final class GameUpdater {
                     canInteract && input.mineRequested()
             );
 
-            ctx.enemySystem().update(delta, ctx.player(), ctx.playerStats(), weaponState);
+            if (simulateEnemies) {
+                // singleplayer/simulation mode: update enemies using single-player context
+                java.util.List<com.droiddungeon.grid.Player> players = java.util.List.of(ctx.player());
+                java.util.Map<Integer, com.droiddungeon.player.PlayerStats> stats = new java.util.HashMap<>();
+                stats.put(ctx.player().id(), ctx.playerStats());
+                ctx.enemySystem().update(delta, players, stats);
+            }
         } else {
             if (cameraController != null) {
                 cameraController.update(ctx.grid(), ctx.player(), delta);

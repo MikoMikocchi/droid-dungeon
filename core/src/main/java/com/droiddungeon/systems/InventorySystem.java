@@ -26,19 +26,20 @@ public final class InventorySystem {
     private final EntityWorld entityWorld;
     private final Grid grid;
     private final CraftingSystem craftingSystem;
+    private final com.droiddungeon.items.GroundItemStore groundStore;
     private int selectedRecipeIndex;
-    private final List<GroundItem> groundItems = new ArrayList<>();
 
     private ItemStack cursorStack;
     private boolean inventoryOpen;
     private int selectedSlotIndex;
     private int equippedSlotIndex;
 
-    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid, EntityWorld entityWorld) {
+    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid, EntityWorld entityWorld, com.droiddungeon.items.GroundItemStore groundStore) {
         this.inventory = inventory;
         this.itemRegistry = itemRegistry;
         this.grid = grid;
         this.entityWorld = entityWorld;
+        this.groundStore = groundStore;
         this.craftingSystem = new CraftingSystem(inventory, itemRegistry, CraftingRecipes.basic());
         this.selectedRecipeIndex = 0;
         this.cursorStack = null;
@@ -88,9 +89,9 @@ public final class InventorySystem {
     public void pickUpItemsAtPlayer(Player player) {
         int playerX = player.getGridX();
         int playerY = player.getGridY();
-        Iterator<GroundItem> iterator = groundItems.iterator();
-        while (iterator.hasNext()) {
-            GroundItem groundItem = iterator.next();
+        // operate on a copy to avoid concurrent modification on the store
+        List<GroundItem> snapshot = groundStore.getGroundItems();
+        for (GroundItem groundItem : snapshot) {
             if (!groundItem.isAt(playerX, playerY)) {
                 continue;
             }
@@ -111,18 +112,13 @@ public final class InventorySystem {
                     pouchRemain = inventory.add(pouchRemain, itemRegistry);
                 }
 
-                iterator.remove();
-                if (entityWorld != null) {
-                    entityWorld.remove(groundItem);
-                }
+                // remove original bundle
+                groundStore.removeGroundItem(groundItem.id());
+
                 if (!leftovers.isEmpty() || pouchRemain != null) {
                     ItemStack pouchStack = pouchRemain != null ? pouchRemain : groundItem.getStack();
                     List<ItemStack> remainingContents = leftovers.isEmpty() ? List.of() : leftovers;
-                    GroundItem newBundle = new GroundItem(EntityIds.next(), playerX, playerY, pouchStack, remainingContents);
-                    groundItems.add(newBundle);
-                    if (entityWorld != null) {
-                        entityWorld.add(newBundle);
-                    }
+                    groundStore.addGroundBundle(playerX, playerY, pouchStack, remainingContents);
                 }
             } else {
                 ItemStack stack = groundItem.getStack();
@@ -131,12 +127,9 @@ public final class InventorySystem {
                     remaining = inventory.add(remaining, itemRegistry);
                 }
                 if (remaining == null) {
-                    iterator.remove();
-                    if (entityWorld != null) {
-                        entityWorld.remove(groundItem);
-                    }
+                    groundStore.removeGroundItem(groundItem.id());
                 } else if (remaining.count() != stack.count()) {
-                    groundItem.setStack(remaining);
+                    groundStore.upsertGroundItem(groundItem.id(), groundItem.getGridX(), groundItem.getGridY(), remaining);
                 }
             }
         }
@@ -193,53 +186,11 @@ public final class InventorySystem {
         if (!grid.isInside(gridX, gridY)) {
             return;
         }
-        int maxStack = itemRegistry.maxStackSize(stack.itemId());
-        ItemStack remaining = stack;
-
-        for (GroundItem groundItem : groundItems) {
-            if (!groundItem.isAt(gridX, gridY)) {
-                continue;
-            }
-            if (!groundItem.getStack().canStackWith(remaining)) {
-                continue;
-            }
-            int space = maxStack - groundItem.getStack().count();
-            if (space <= 0) {
-                continue;
-            }
-            int toMove = Math.min(space, remaining.count());
-            groundItem.setStack(groundItem.getStack().withCount(groundItem.getStack().count() + toMove));
-            if (toMove == remaining.count()) {
-                remaining = null;
-                break;
-            }
-            remaining = remaining.withCount(remaining.count() - toMove);
-        }
-
-        while (remaining != null) {
-            int chunk = Math.min(remaining.count(), maxStack);
-            GroundItem newItem = new GroundItem(EntityIds.next(), gridX, gridY, new ItemStack(remaining.itemId(), chunk, remaining.durability()));
-            groundItems.add(newItem);
-            if (entityWorld != null) {
-                entityWorld.add(newItem);
-            }
-            if (remaining.count() <= maxStack) {
-                remaining = null;
-            } else {
-                remaining = remaining.withCount(remaining.count() - chunk);
-            }
-        }
+        groundStore.addGroundStack(gridX, gridY, stack);
     }
 
     public void addGroundBundle(int gridX, int gridY, ItemStack pouchStack, List<ItemStack> bundled) {
-        if (pouchStack == null || bundled == null || bundled.isEmpty()) {
-            return;
-        }
-        GroundItem item = new GroundItem(EntityIds.next(), gridX, gridY, pouchStack, bundled);
-        groundItems.add(item);
-        if (entityWorld != null) {
-            entityWorld.add(item);
-        }
+        groundStore.addGroundBundle(gridX, gridY, pouchStack, bundled);
     }
 
     public List<ItemStack> drainAllItems() {
@@ -255,12 +206,8 @@ public final class InventorySystem {
             result.add(cursorStack);
             cursorStack = null;
         }
-        if (entityWorld != null) {
-            for (GroundItem groundItem : groundItems) {
-                entityWorld.remove(groundItem);
-            }
-        }
-        groundItems.clear();
+        // clear all ground items via the shared store (it will remove from entity world)
+        groundStore.clear();
         selectedSlotIndex = 0;
         updateEquippedFromSelection();
         inventoryOpen = false;
@@ -353,38 +300,19 @@ public final class InventorySystem {
     }
 
     public List<GroundItem> getGroundItems() {
-        return groundItems;
+        return groundStore.getGroundItems();
     }
 
     public void removeGroundItem(int id) {
-        groundItems.removeIf(gi -> {
-            if (gi.id() == id) {
-                if (entityWorld != null) {
-                    entityWorld.remove(gi);
-                }
-                return true;
-            }
-            return false;
-        });
+        groundStore.removeGroundItem(id);
     }
 
     public void upsertGroundItem(int id, int x, int y, ItemStack stack) {
-        if (stack == null) return;
-        removeGroundItem(id);
-        GroundItem newItem = new GroundItem(id, x, y, stack);
-        groundItems.add(newItem);
-        if (entityWorld != null) {
-            entityWorld.add(newItem);
-        }
+        groundStore.upsertGroundItem(id, x, y, stack);
     }
 
     public void clearGroundItems() {
-        if (entityWorld != null) {
-            for (GroundItem groundItem : groundItems) {
-                entityWorld.remove(groundItem);
-            }
-        }
-        groundItems.clear();
+        groundStore.clear();
     }
 
     private void updateEquippedFromSelection() {

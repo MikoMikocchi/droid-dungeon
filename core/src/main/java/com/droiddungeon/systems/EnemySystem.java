@@ -3,21 +3,17 @@ package com.droiddungeon.systems;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.SplittableRandom;
 import java.util.Set;
+import java.util.SplittableRandom;
 
 import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.enemies.EnemyType;
-import com.droiddungeon.entity.DamageableEntity;
 import com.droiddungeon.entity.EntityIds;
-import com.droiddungeon.entity.EntityLayer;
 import com.droiddungeon.entity.EntityWorld;
-import com.droiddungeon.entity.RenderableEntity;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.player.PlayerStats;
-import com.droiddungeon.systems.InventorySystem;
 
 /**
  * Spawns and updates hostile entities.
@@ -26,16 +22,16 @@ public final class EnemySystem {
     private final Grid grid;
     private final long worldSeed;
     private final EntityWorld entityWorld;
-    private final InventorySystem inventorySystem;
+    private final com.droiddungeon.items.GroundItemStore groundStore;
     private final List<Enemy> enemies = new ArrayList<>();
     private final Set<String> spawnedRooms = new HashSet<>();
     private final SplittableRandom ambientRng;
 
-    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, InventorySystem inventorySystem) {
+    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, com.droiddungeon.items.GroundItemStore groundStore) {
         this.grid = grid;
         this.worldSeed = worldSeed;
         this.entityWorld = entityWorld;
-        this.inventorySystem = inventorySystem;
+        this.groundStore = groundStore;
         this.ambientRng = new SplittableRandom(worldSeed ^ 0xACEDBADEL);
     }
 
@@ -103,11 +99,14 @@ public final class EnemySystem {
         }
     }
 
-    public void update(float deltaSeconds, Player player, PlayerStats playerStats, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
-        if (player == null || playerStats == null) {
+    public void update(float deltaSeconds, java.util.List<Player> players, java.util.Map<Integer, PlayerStats> playerStatsById) {
+        if (players == null || players.isEmpty()) {
             return;
         }
-        spawnNearby(player);
+        // spawn near all players
+        for (Player p : players) {
+            spawnNearby(p);
+        }
 
         Set<Long> occupied = new HashSet<>();
         for (Enemy enemy : enemies) {
@@ -117,12 +116,16 @@ public final class EnemySystem {
         for (Enemy enemy : enemies) {
             enemy.tickCooldowns(deltaSeconds);
 
-            boolean seesPlayer = seesPlayer(enemy, player);
+            Player nearest = findNearestPlayer(enemy, players);
+            boolean seesPlayer = nearest != null && seesPlayer(enemy, nearest);
             enemy.setHasLineOfSight(seesPlayer);
 
-            if (seesPlayer) {
-                chasePlayer(enemy, player, occupied);
-                attemptAttack(enemy, player, playerStats);
+            if (seesPlayer && nearest != null) {
+                chasePlayer(enemy, nearest, occupied);
+                var stats = playerStatsById.get(nearest.id());
+                if (stats != null) {
+                    attemptAttack(enemy, nearest, stats);
+                }
             } else {
                 wander(enemy, occupied);
             }
@@ -131,8 +134,6 @@ public final class EnemySystem {
         for (Enemy enemy : enemies) {
             enemy.updateRender(deltaSeconds);
         }
-
-        applyWeaponHits(player, weaponState);
 
         enemies.removeIf(enemy -> {
             if (enemy.isDead()) {
@@ -143,6 +144,21 @@ public final class EnemySystem {
             }
             return false;
         });
+    }
+
+    private Player findNearestPlayer(Enemy enemy, java.util.List<Player> players) {
+        Player best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (Player p : players) {
+            float dx = (p.getGridX() + 0.5f) - (enemy.getGridX() + 0.5f);
+            float dy = (p.getGridY() + 0.5f) - (enemy.getGridY() + 0.5f);
+            float d2 = dx * dx + dy * dy;
+            if (d2 < bestDist) {
+                bestDist = d2;
+                best = p;
+            }
+        }
+        return best;
     }
 
     private void spawnNearby(Player player) {
@@ -291,58 +307,6 @@ public final class EnemySystem {
         return true;
     }
 
-    private void applyWeaponHits(Player player, com.droiddungeon.systems.WeaponSystem.WeaponState weaponState) {
-        if (entityWorld == null || weaponState == null || !weaponState.swinging()) {
-            return;
-        }
-        float reach = weaponState.reachTiles();
-        if (reach <= 0f) {
-            return;
-        }
-        float px = player.getRenderX() + 0.5f;
-        float py = player.getRenderY() + 0.5f;
-        float inner = weaponState.innerHoleTiles();
-        float outer2 = reach * reach;
-        float inner2 = inner * inner;
-
-        for (var entity : entityWorld.all()) {
-            if (entity.layer() != EntityLayer.ACTOR) {
-                continue;
-            }
-            if (entity instanceof Player) {
-                continue; // don't hit the player with own weapon
-            }
-            if (!(entity instanceof RenderableEntity renderable) || !(entity instanceof DamageableEntity damageable)) {
-                continue;
-            }
-            if (damageable.isDead()) {
-                continue;
-            }
-
-            float ex = renderable.renderX() + 0.5f;
-            float ey = renderable.renderY() + 0.5f;
-            float dx = ex - px;
-            float dy = ey - py;
-            float dist2 = dx * dx + dy * dy;
-            if (dist2 > outer2 || dist2 < inner2) {
-                continue;
-            }
-            float angleToEntity = (float) Math.atan2(dy, dx);
-            float delta = angleDelta(weaponState.aimAngleRad(), angleToEntity);
-            if (Math.abs(delta) > weaponState.arcRad() * 0.5f) {
-                continue;
-            }
-            boolean damaged = false;
-            if (entity instanceof Enemy enemy) {
-                damaged = enemy.applyDamage(weaponState.damage(), weaponState.swingIndex());
-            } else {
-                damaged = damageable.applyDamage(weaponState.damage());
-            }
-            if (damaged && inventorySystem != null) {
-                inventorySystem.damageEquippedItem(1);
-            }
-        }
-    }
 
     private float angleDelta(float a, float b) {
         float diff = a - b;

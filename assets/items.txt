@@ -5,7 +5,7 @@ steel_rapier;Steel Rapier;1;textures/items/weapons/steel_rapier.png;true;220
 
 steel_pickaxe;Steel Pickaxe;1;textures/items/tools/steel_pickaxe.png;true;280;PICKAXE
 steel_shovel;Steel Shovel;1;textures/items/tools/steel_pickaxe.png;true;180;SHOVEL
-steel_axe;Steel Axe;1;textures/items/tools/steel_pickaxe.png;true;200;AXE
+steel_axe;Steel Axe;1;textures/items/tools/steel_axe.png;true;200;AXE
 
 pouch;Pouch;1;textures/items/containers/pouch.png
 
