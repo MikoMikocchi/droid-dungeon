@@ -12,8 +12,8 @@ import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
-import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.systems.MiningSystem;
+import com.droiddungeon.systems.WeaponSystem;
 
 /**
  * Builds GameContext instances for initial run and restarts.

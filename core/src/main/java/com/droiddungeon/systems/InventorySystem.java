@@ -1,14 +1,12 @@
 package com.droiddungeon.systems;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.droiddungeon.crafting.CraftingSystem;
 import com.droiddungeon.crafting.CraftingRecipes;
-import com.droiddungeon.entity.EntityIds;
+import com.droiddungeon.crafting.CraftingSystem;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;

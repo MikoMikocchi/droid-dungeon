@@ -7,14 +7,11 @@ import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.input.InputFrame;
-import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameContextFactory;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.EnemySystem;
-import com.droiddungeon.systems.InventorySystem;
 
 /**
  * Minimal headless loop for server tick: does not rely on Gdx.graphics/Gdx.input.
