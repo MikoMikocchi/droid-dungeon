@@ -3,6 +3,7 @@ package com.droiddungeon.debug;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
@@ -12,7 +13,6 @@ import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.systems.CompanionSystem;
-import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 

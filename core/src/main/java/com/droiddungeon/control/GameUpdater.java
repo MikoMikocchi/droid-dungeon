@@ -1,19 +1,19 @@
 package com.droiddungeon.control;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.badlogic.gdx.math.Vector2;
 import com.droiddungeon.config.GameConfig;
+import com.droiddungeon.grid.Player;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.input.InputFrame;
+import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.WeaponSystem;
-import com.droiddungeon.grid.Player;
-import com.droiddungeon.player.PlayerStats;
-
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap; 
 
 /**
  * Runs per-frame world updates (movement, combat, AI).

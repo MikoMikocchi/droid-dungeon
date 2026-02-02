@@ -24,7 +24,7 @@ public final class GroundItemStore {
 
     public synchronized void addGroundStack(int gridX, int gridY, ItemStack stack) {
         if (stack == null) return;
-        int maxStack = itemRegistry != null ? itemRegistry.maxStackSize(stack.itemId()) : Inventory.DEFAULT_MAX_STACK; 
+        int maxStack = itemRegistry != null ? itemRegistry.maxStackSize(stack.itemId()) : Inventory.DEFAULT_MAX_STACK;
         ItemStack remaining = stack;
 
         for (GroundItem groundItem : groundItems) {

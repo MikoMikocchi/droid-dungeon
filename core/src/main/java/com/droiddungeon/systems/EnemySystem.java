@@ -3,6 +3,7 @@ package com.droiddungeon.systems;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SplittableRandom;
 
@@ -13,11 +14,9 @@ import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
-import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.net.dto.EnemySnapshotDto;
-
-import java.util.Map;
+import com.droiddungeon.player.PlayerStats;
 
 /**
  * Spawns and updates hostile entities.
