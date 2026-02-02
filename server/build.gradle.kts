@@ -20,6 +20,9 @@ dependencies {
     implementation("org.apache.pekko:pekko-http_3:$pekkoVersion")
     implementation("org.apache.pekko:pekko-serialization-jackson_3:$pekkoVersion")
     implementation("org.apache.pekko:pekko-http-spray-json_3:$pekkoVersion")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.17.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:2.17.2")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("com.typesafe:config:1.4.3")
 }

@@ -14,6 +14,10 @@ import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.player.PlayerStats;
+import com.droiddungeon.items.GroundItemStore;
+import com.droiddungeon.net.dto.EnemySnapshotDto;
+
+import java.util.Map;
 
 /**
  * Spawns and updates hostile entities.
@@ -22,12 +26,12 @@ public final class EnemySystem {
     private final Grid grid;
     private final long worldSeed;
     private final EntityWorld entityWorld;
-    private final com.droiddungeon.items.GroundItemStore groundStore;
+    private final GroundItemStore groundStore;
     private final List<Enemy> enemies = new ArrayList<>();
     private final Set<String> spawnedRooms = new HashSet<>();
     private final SplittableRandom ambientRng;
 
-    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, com.droiddungeon.items.GroundItemStore groundStore) {
+    public EnemySystem(Grid grid, long worldSeed, EntityWorld entityWorld, GroundItemStore groundStore) {
         this.grid = grid;
         this.worldSeed = worldSeed;
         this.entityWorld = entityWorld;
@@ -47,7 +51,7 @@ public final class EnemySystem {
     /**
      * Replace or update enemies from authoritative snapshot (network mode).
      */
-    public void applySnapshot(com.droiddungeon.net.dto.EnemySnapshotDto[] addsOrUpdates, int[] removals, boolean full) {
+    public void applySnapshot(EnemySnapshotDto[] addsOrUpdates, int[] removals, boolean full) {
         if (full) {
             enemies.clear();
         }
@@ -57,7 +61,7 @@ public final class EnemySystem {
             }
         }
         if (addsOrUpdates != null) {
-            for (com.droiddungeon.net.dto.EnemySnapshotDto s : addsOrUpdates) {
+            for (EnemySnapshotDto s : addsOrUpdates) {
                 upsertEnemy(s);
             }
         }
@@ -75,7 +79,7 @@ public final class EnemySystem {
         });
     }
 
-    private void upsertEnemy(com.droiddungeon.net.dto.EnemySnapshotDto s) {
+    private void upsertEnemy(EnemySnapshotDto s) {
         removeEnemy(s.id());
         EnemyType type;
         try {
@@ -99,7 +103,7 @@ public final class EnemySystem {
         }
     }
 
-    public void update(float deltaSeconds, java.util.List<Player> players, java.util.Map<Integer, PlayerStats> playerStatsById) {
+    public void update(float deltaSeconds, List<Player> players, Map<Integer, PlayerStats> playerStatsById) {
         if (players == null || players.isEmpty()) {
             return;
         }
@@ -146,7 +150,7 @@ public final class EnemySystem {
         });
     }
 
-    private Player findNearestPlayer(Enemy enemy, java.util.List<Player> players) {
+    private Player findNearestPlayer(Enemy enemy, List<Player> players) {
         Player best = null;
         float bestDist = Float.MAX_VALUE;
         for (Player p : players) {

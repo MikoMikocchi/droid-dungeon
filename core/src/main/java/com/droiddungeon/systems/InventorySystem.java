@@ -13,6 +13,7 @@ import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
+import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
 
 /**
@@ -24,7 +25,7 @@ public final class InventorySystem {
     private final EntityWorld entityWorld;
     private final Grid grid;
     private final CraftingSystem craftingSystem;
-    private final com.droiddungeon.items.GroundItemStore groundStore;
+    private final GroundItemStore groundStore;
     private int selectedRecipeIndex;
 
     private ItemStack cursorStack;
@@ -32,7 +33,7 @@ public final class InventorySystem {
     private int selectedSlotIndex;
     private int equippedSlotIndex;
 
-    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid, EntityWorld entityWorld, com.droiddungeon.items.GroundItemStore groundStore) {
+    public InventorySystem(Inventory inventory, ItemRegistry itemRegistry, Grid grid, EntityWorld entityWorld, GroundItemStore groundStore) {
         this.inventory = inventory;
         this.itemRegistry = itemRegistry;
         this.grid = grid;

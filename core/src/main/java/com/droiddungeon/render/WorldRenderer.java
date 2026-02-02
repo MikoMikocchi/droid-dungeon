@@ -23,10 +23,9 @@ import com.droiddungeon.grid.TileMaterial;
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
-import com.droiddungeon.systems.WeaponSystem.WeaponState;
 import com.droiddungeon.systems.MiningSystem.MiningTarget;
+import com.droiddungeon.systems.WeaponSystem.WeaponState;
 import com.droiddungeon.ui.MapMarker;
-import com.droiddungeon.render.ClientAssets;
 
 public final class WorldRenderer {
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
@@ -373,7 +372,7 @@ public final class WorldRenderer {
         for (int y = visible.minTileY; y <= visible.maxTileY; y++) {
             for (int x = visible.minTileX; x <= visible.maxTileX; x++) {
                 TileMaterial floor = grid.getTileMaterial(x, y);
-                com.droiddungeon.grid.DungeonGenerator.RoomType roomType = grid.getRoomType(x, y);
+                RoomType roomType = grid.getRoomType(x, y);
                 float wx = x * tileSize;
                 float wy = y * tileSize;
 
@@ -403,10 +402,6 @@ public final class WorldRenderer {
             }
         }
         spriteBatch.setColor(Color.WHITE);
-    }
-
-    private void renderGridLines(float tileSize, VisibleWindow visible) {
-        // Grid lines intentionally disabled (request: remove grid overlay). Keep method for quick re-enable if needed.
     }
 
     private boolean hasIcon(TextureRegion icon) {

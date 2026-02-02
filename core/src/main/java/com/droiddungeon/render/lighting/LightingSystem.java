@@ -74,17 +74,11 @@ public class LightingSystem {
         random.setSeed(room.x * 73856093L ^ room.y * 19349663L);
 
         switch (room.type) {
-            case SAFE:
-                // Safe rooms get more lighting
+            case SAFE -> // Safe rooms get more lighting
                 generateSafeRoomLights(grid, room);
-                break;
-            case DANGER:
-                // Danger rooms are darker with fewer lights
+            case DANGER -> // Danger rooms are darker with fewer lights
                 generateDangerRoomLights(grid, room);
-                break;
-            default:
-                generateDefaultLights(grid, room);
-                break;
+            default -> generateDefaultLights(grid, room);
         }
     }
 

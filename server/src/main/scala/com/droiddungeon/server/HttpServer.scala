@@ -8,19 +8,34 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.Credentials
 import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message}
 import org.apache.pekko.stream.scaladsl.{Sink, Source, Keep}
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import org.apache.pekko.util.Timeout
 import org.apache.pekko.stream.typed.scaladsl.ActorSource
-import org.apache.pekko.serialization.SerializationExtension
 import org.apache.pekko.util.ByteString
 
 import com.droiddungeon.config.GameConfig
 import com.droiddungeon.input.{InputFrame, MovementIntent, WeaponInput}
 import com.droiddungeon.items.ItemRegistry
 import com.droiddungeon.server.ServerGameLoop
+import com.droiddungeon.net.BinaryProtocol
+import com.droiddungeon.net.dto.{
+  ClientInputDto,
+  WorldSnapshotDto,
+  WelcomeDto,
+  ChunkSnapshotDto,
+  BlockChangeDto,
+  PlayerSnapshotDto,
+  EnemySnapshotDto,
+  GroundItemSnapshotDto,
+  WeaponStateSnapshotDto,
+  MiningStateSnapshotDto
+}
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.cbor.CBORFactory
+import java.nio.ByteBuffer
 import java.nio.file.{Files, Paths}
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
@@ -32,7 +47,7 @@ object HttpServer:
   private def websocketFlow(world: org.apache.pekko.actor.typed.ActorRef[GameWorldActor.Command])(using system: ActorSystem[Nothing]): Flow[Message, Message, Any] =
     import system.executionContext
     val playerId = java.util.UUID.randomUUID().toString
-    val serialization = SerializationExtension(system)
+    val cbor = new ObjectMapper(new CBORFactory()).findAndRegisterModules()
 
     val sink: Sink[Message, Any] = Flow[Message]
       .collect { case bm: BinaryMessage => bm }
@@ -41,14 +56,7 @@ object HttpServer:
         ByteString.empty
       })
       .filter(_.nonEmpty)
-      .map(bytes =>
-        serialization
-          .deserialize(bytes.toArray, classOf[ClientInput])
-          .flatMap {
-            case input: ClientInput => Success(input)
-            case other => Failure(new IllegalArgumentException(s"Unexpected payload type: ${other.getClass.getName}"))
-          }
-      )
+      .map(bytes => Try(deserializeInput(cbor, bytes.toArray)))
       .mapConcat {
         case Success(input) =>
           List(input.copy(playerId = playerId))
@@ -65,21 +73,18 @@ object HttpServer:
         bufferSize = 64,
         overflowStrategy = OverflowStrategy.dropHead
       ).map { snap =>
-        serialization.serialize(snap) match
-          case Success(bytes) => BinaryMessage(ByteString(bytes))
-          case Failure(ex) =>
-            system.log.warn("Failed to serialize WorldSnapshot, dropping: {}", ex.getMessage)
-            BinaryMessage(ByteString.empty)
-      }.mapConcat {
-        case bm @ BinaryMessage.Strict(data) if data.nonEmpty => bm :: Nil
-        case _ => Nil
+        val dto = toWorldSnapshotDto(snap)
+        val payload = cbor.writeValueAsBytes(dto)
+        val framed = BinaryProtocol.wrap(BinaryProtocol.TYPE_SNAPSHOT, payload)
+        BinaryMessage(ByteString(framed))
       }
 
-    val welcome = serialization.serialize(Welcome(playerId)) match
-      case Success(bytes) => BinaryMessage(ByteString(bytes))
-      case Failure(ex) =>
-        system.log.warn("Failed to serialize Welcome, dropping: {}", ex.getMessage)
-        BinaryMessage(ByteString.empty)
+    val welcome = {
+      val dto = new WelcomeDto(playerId, null, null)
+      val payload = cbor.writeValueAsBytes(dto)
+      val framed = BinaryProtocol.wrap(BinaryProtocol.TYPE_WELCOME, payload)
+      BinaryMessage(ByteString(framed))
+    }
     val source: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]] =
       Source.single(welcome).concatMat(snapshotSource)(Keep.right)
 
@@ -90,6 +95,77 @@ object HttpServer:
       done.onComplete(_ => world ! GameWorldActor.UnregisterSession(ref))(using system.executionContext)
       ref
     }
+
+  private def deserializeInput(cbor: ObjectMapper, bytes: Array[Byte]): ClientInput = {
+    val buffer = ByteBuffer.wrap(bytes)
+    val header = BinaryProtocol.readHeader(buffer)
+    if (header.version() != BinaryProtocol.VERSION_1)
+      throw new IllegalArgumentException(s"Unsupported protocol version: ${header.version()}")
+    if (header.`type`() != BinaryProtocol.TYPE_INPUT)
+      throw new IllegalArgumentException(s"Unexpected message type: ${header.`type`()}")
+    val payload = new Array[Byte](buffer.remaining())
+    buffer.get(payload)
+    val dto = cbor.readValue(payload, classOf[ClientInputDto])
+    val m = dto.movement()
+    val w = dto.weapon()
+    val movement = com.droiddungeon.server.MovementIntentDto(
+      m.leftHeld(),
+      m.rightHeld(),
+      m.upHeld(),
+      m.downHeld(),
+      m.leftJustPressed(),
+      m.rightJustPressed(),
+      m.upJustPressed(),
+      m.downJustPressed()
+    )
+    val weapon = com.droiddungeon.server.WeaponInputDto(w.attackJustPressed(), w.attackHeld(), w.aimWorldX(), w.aimWorldY())
+    ClientInput(dto.tick(), dto.playerId(), movement, weapon, dto.drop(), dto.pickUp(), dto.mine())
+  }
+
+  private def toWorldSnapshotDto(snap: WorldSnapshot): WorldSnapshotDto = {
+    val chunks = snap.chunks.map { c =>
+      new ChunkSnapshotDto(
+        c.chunkX,
+        c.chunkY,
+        c.blocks.map(b => new BlockChangeDto(b.x, b.y, b.materialId, b.blockHp)).toArray
+      )
+    }.toArray
+    val players = snap.players.map { p =>
+      new PlayerSnapshotDto(p.playerId, p.x, p.y, p.gridX, p.gridY, p.hp, p.lastProcessedTick)
+    }.toArray
+    val enemies = snap.enemies.map { e =>
+      new EnemySnapshotDto(e.id, e.enemyType, e.x, e.y, e.gridX, e.gridY, e.hp)
+    }.toArray
+    val blockChanges = snap.blockChanges.map { b =>
+      new BlockChangeDto(b.x, b.y, b.materialId, b.blockHp)
+    }.toArray
+    val groundItems = snap.groundItems.map { g =>
+      new GroundItemSnapshotDto(g.id, g.x, g.y, g.itemId, g.count, g.durability)
+    }.toArray
+    val weaponStates = snap.weaponStates.map { w =>
+      new WeaponStateSnapshotDto(w.playerId, w.swinging, w.swingProgress, w.aimAngleRad)
+    }.toArray
+    val miningStates = snap.miningStates.map { m =>
+      new MiningStateSnapshotDto(m.playerId, m.targetX, m.targetY, m.progress)
+    }.toArray
+
+    new WorldSnapshotDto(
+      snap.tick,
+      snap.seed,
+      snap.version,
+      snap.full,
+      chunks,
+      null,
+      players,
+      enemies,
+      snap.enemyRemovals.toArray,
+      blockChanges,
+      groundItems,
+      snap.groundItemRemovals.toArray,
+      weaponStates,
+      miningStates
+    )
+  }
 
   def main(args: Array[String]): Unit =
     implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "droiddungeon-server")

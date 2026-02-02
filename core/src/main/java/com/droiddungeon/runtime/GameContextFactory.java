@@ -14,6 +14,7 @@ import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.MiningSystem;
 import com.droiddungeon.systems.WeaponSystem;
+import com.droiddungeon.items.GroundItemStore;
 
 /**
  * Builds GameContext instances for initial run and restarts.
@@ -27,7 +28,7 @@ public final class GameContextFactory {
     private final ItemRegistry itemRegistry;
     private final EntityWorld entityWorld;
     private final EnemySystem enemySystem;
-    private final com.droiddungeon.items.GroundItemStore groundStore;
+    private final GroundItemStore groundStore;
 
     public GameContextFactory(
             GameConfig config,
@@ -38,7 +39,7 @@ public final class GameContextFactory {
             ItemRegistry itemRegistry,
             EntityWorld entityWorld,
             EnemySystem enemySystem,
-            com.droiddungeon.items.GroundItemStore groundStore
+            GroundItemStore groundStore
     ) {
         this.config = config;
         this.grid = grid;

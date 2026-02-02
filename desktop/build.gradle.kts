@@ -12,7 +12,9 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop")
     implementation("com.badlogicgames.gdx:gdx-freetype:$gdxVersion")
     implementation("org.java-websocket:Java-WebSocket:1.5.6")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.17.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:2.17.2")
 }
 
 application {

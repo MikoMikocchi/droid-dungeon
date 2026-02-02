@@ -1,6 +1,9 @@
 package com.droiddungeon.desktop;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -9,6 +12,7 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
+import com.droiddungeon.net.BinaryProtocol;
 import com.droiddungeon.net.NetworkClientAdapter;
 import com.droiddungeon.net.dto.ClientInputDto;
 import com.droiddungeon.net.dto.MovementIntentDto;
@@ -17,10 +21,11 @@ import com.droiddungeon.net.dto.WelcomeDto;
 import com.droiddungeon.net.dto.WorldSnapshotDto;
 import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.runtime.NetworkSnapshotBuffer;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 
 public final class NetworkClient extends WebSocketClient implements NetworkClientAdapter {
-    private final Gson gson = new Gson();
+    private final ObjectMapper cbor = new ObjectMapper(new CBORFactory()).findAndRegisterModules();
     private final NetworkSnapshotBuffer buffer;
     private final AtomicReference<WorldSnapshotDto> latestSnapshot = new AtomicReference<>();
     private volatile boolean connected = false;
@@ -39,47 +44,62 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
     }
 
     @Override
-    public void onMessage(String message) {
+    public void onMessage(ByteBuffer bytes) {
         try {
-            // Welcome message?
-            WelcomeDto welcome = gson.fromJson(message, WelcomeDto.class);
-            if (welcome != null && welcome.playerId() != null && welcome.playerId().length() > 0 && welcome.player() == null && welcome.players() == null) {
-                playerId = welcome.playerId();
+            bytes.order(ByteOrder.BIG_ENDIAN);
+            BinaryProtocol.Header header = BinaryProtocol.readHeader(bytes);
+            if (header.version() != BinaryProtocol.VERSION_1) return;
+
+            byte[] payload = new byte[bytes.remaining()];
+            bytes.get(payload);
+
+            if (header.type() == BinaryProtocol.TYPE_WELCOME) {
+                WelcomeDto welcome = cbor.readValue(payload, WelcomeDto.class);
+                if (welcome != null && welcome.playerId() != null && !welcome.playerId().isEmpty()) {
+                    playerId = welcome.playerId();
+                }
                 return;
             }
-            WorldSnapshotDto snap = gson.fromJson(message, WorldSnapshotDto.class);
-            if (snap != null) {
-                latestSnapshot.set(snap);
-                if (playerId != null && snap.players() != null) {
-                    for (var p : snap.players()) {
-                        if (playerId.equals(p.playerId())) {
-                            buffer.push(new NetworkSnapshot(
-                                    snap.tick(),
-                                    p.x(),
-                                    p.y(),
-                                    p.gridX(),
-                                    p.gridY(),
-                                    p.hp(),
-                                    p.lastProcessedTick()
-                            ));
-                            return;
+            if (header.type() == BinaryProtocol.TYPE_SNAPSHOT) {
+                WorldSnapshotDto snap = cbor.readValue(payload, WorldSnapshotDto.class);
+                if (snap != null) {
+                    latestSnapshot.set(snap);
+                    if (playerId != null && snap.players() != null) {
+                        for (var p : snap.players()) {
+                            if (playerId.equals(p.playerId())) {
+                                buffer.push(new NetworkSnapshot(
+                                        snap.tick(),
+                                        p.x(),
+                                        p.y(),
+                                        p.gridX(),
+                                        p.gridY(),
+                                        p.hp(),
+                                        p.lastProcessedTick()
+                                ));
+                                return;
+                            }
                         }
                     }
-                }
-                if (snap.player() != null) {
-                    buffer.push(new NetworkSnapshot(
-                            snap.tick(),
-                            snap.player().x(),
-                            snap.player().y(),
-                            snap.player().gridX(),
-                            snap.player().gridY(),
-                            snap.player().hp(),
-                            snap.player().lastProcessedTick()
-                    ));
+                    if (snap.player() != null) {
+                        buffer.push(new NetworkSnapshot(
+                                snap.tick(),
+                                snap.player().x(),
+                                snap.player().y(),
+                                snap.player().gridX(),
+                                snap.player().gridY(),
+                                snap.player().hp(),
+                                snap.player().lastProcessedTick()
+                        ));
+                    }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException | IOException ignored) {
         }
+    }
+
+    @Override
+    public void onMessage(String message) {
+        // JSON payloads are no longer supported
     }
 
     @Override public void onClose(int code, String reason, boolean remote) { connected = false; }
@@ -110,7 +130,12 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
         WeaponInputDto w = new WeaponInputDto(weapon.attackJustPressed(), weapon.attackHeld(), weapon.aimWorldX(), weapon.aimWorldY());
         ClientInputDto dto = new ClientInputDto(tick, pid, m, w, drop, pickUp, mine);
         tickCounter = Math.max(tickCounter, tick + 1);
-        send(gson.toJson(dto));
+        try {
+            byte[] payload = cbor.writeValueAsBytes(dto);
+            byte[] framed = BinaryProtocol.wrap(BinaryProtocol.TYPE_INPUT, payload);
+            send(framed);
+        } catch (IOException ignored) {
+        }
     }
 
     @Override

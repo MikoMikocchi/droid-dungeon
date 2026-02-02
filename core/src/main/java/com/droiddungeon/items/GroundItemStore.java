@@ -7,6 +7,7 @@ import java.util.List;
 import com.droiddungeon.entity.EntityIds;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.inventory.ItemStack;
+import com.droiddungeon.inventory.Inventory;
 
 /**
  * Shared container for ground items in the world used by server and client.
@@ -23,7 +24,7 @@ public final class GroundItemStore {
 
     public synchronized void addGroundStack(int gridX, int gridY, ItemStack stack) {
         if (stack == null) return;
-        int maxStack = itemRegistry != null ? itemRegistry.maxStackSize(stack.itemId()) : com.droiddungeon.inventory.Inventory.DEFAULT_MAX_STACK;
+        int maxStack = itemRegistry != null ? itemRegistry.maxStackSize(stack.itemId()) : Inventory.DEFAULT_MAX_STACK; 
         ItemStack remaining = stack;
 
         for (GroundItem groundItem : groundItems) {

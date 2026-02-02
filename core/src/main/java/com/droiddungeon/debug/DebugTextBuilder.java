@@ -12,6 +12,7 @@ import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.systems.CompanionSystem;
+import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 
@@ -105,7 +106,7 @@ public final class DebugTextBuilder {
         }
 
         if (enemySystem != null) {
-            for (com.droiddungeon.enemies.Enemy enemy : enemySystem.getEnemies()) {
+            for (Enemy enemy : enemySystem.getEnemies()) {
                 if (enemy.getGridX() == tileX && enemy.getGridY() == tileY) {
                     text.append(hasEntities ? ", " : "\nEntity: ").append("Catster");
                     hasEntities = true;
@@ -152,7 +153,7 @@ public final class DebugTextBuilder {
         if (enemySystem != null) {
             int total = enemySystem.getEnemies().size();
             int alert = 0;
-            for (com.droiddungeon.enemies.Enemy enemy : enemySystem.getEnemies()) {
+            for (Enemy enemy : enemySystem.getEnemies()) {
                 if (enemy.hasLineOfSight()) {
                     alert++;
                 }

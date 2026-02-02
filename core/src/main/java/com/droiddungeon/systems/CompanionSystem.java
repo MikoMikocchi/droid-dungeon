@@ -5,6 +5,7 @@ import java.util.Deque;
 
 import com.droiddungeon.entity.DamageableEntity;
 import com.droiddungeon.entity.EntityLayer;
+import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.entity.RenderableEntity;
 
 /**
@@ -12,7 +13,7 @@ import com.droiddungeon.entity.RenderableEntity;
  */
 public final class CompanionSystem implements RenderableEntity, DamageableEntity {
     private final int id;
-    private final com.droiddungeon.entity.EntityWorld entityWorld;
+    private final EntityWorld entityWorld;
     private final int delayTiles;
     private final float speedTilesPerSecond;
     private final Deque<int[]> trail = new ArrayDeque<>();
@@ -24,7 +25,7 @@ public final class CompanionSystem implements RenderableEntity, DamageableEntity
     private int lastPlayerGridX;
     private int lastPlayerGridY;
 
-    public CompanionSystem(int id, int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond, com.droiddungeon.entity.EntityWorld entityWorld) {
+    public CompanionSystem(int id, int startGridX, int startGridY, int delayTiles, float speedTilesPerSecond, EntityWorld entityWorld) {
         this.id = id;
         this.delayTiles = Math.max(0, delayTiles);
         this.speedTilesPerSecond = Math.max(0f, speedTilesPerSecond);

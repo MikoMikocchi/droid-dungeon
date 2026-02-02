@@ -3,7 +3,6 @@ package com.droiddungeon.input;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
-import com.droiddungeon.input.MovementIntent;
 
 public final class HeldMovementController {
     private Direction preferredDir = Direction.RIGHT;

@@ -1,17 +1,33 @@
 package com.droiddungeon.server;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.droiddungeon.config.GameConfig;
 import com.droiddungeon.control.GameUpdater;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
+import com.droiddungeon.grid.Player;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.input.InputFrame;
+import com.droiddungeon.inventory.Inventory;
+import com.droiddungeon.items.GroundItem;
+import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
+import com.droiddungeon.net.dto.PlayerSnapshotDto;
+import com.droiddungeon.player.PlayerStats;
+import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameContextFactory;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
+import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.EnemySystem;
+import com.droiddungeon.systems.InventorySystem;
+import com.droiddungeon.systems.MiningSystem;
+import com.droiddungeon.systems.WeaponSystem;
 
 /**
  * Minimal headless loop for server tick: does not rely on Gdx.graphics/Gdx.input.
@@ -29,10 +45,10 @@ public final class ServerGameLoop {
     private final Grid grid;
     private final EntityWorld entityWorld;
     private final ItemRegistry itemRegistry;
-    private final com.droiddungeon.items.GroundItemStore groundStore;
+    private final GroundItemStore groundStore;
 
     // per-player sessions
-    private final java.util.Map<String, com.droiddungeon.runtime.GameContextFactory.PlayerSession> sessions = new java.util.HashMap<>();
+    private final Map<String, GameContextFactory.PlayerSession> sessions = new HashMap<>();
 
     public ServerGameLoop(GameConfig config, ItemRegistry itemRegistry, long worldSeed) {
         this.config = config;
@@ -46,7 +62,7 @@ public final class ServerGameLoop {
 
         this.entityWorld = new EntityWorld();
         this.itemRegistry = itemRegistry;
-        this.groundStore = new com.droiddungeon.items.GroundItemStore(entityWorld, itemRegistry);
+        this.groundStore = new GroundItemStore(entityWorld, itemRegistry);
 
         // enemy system is world-shared
         this.enemySystem = new EnemySystem(grid, worldSeed, entityWorld, groundStore);
@@ -115,8 +131,8 @@ public final class ServerGameLoop {
      */
     public void updateGlobal(float deltaSeconds) {
         // collect players for AI usage
-        java.util.List<com.droiddungeon.grid.Player> players = new java.util.ArrayList<>();
-        java.util.Map<Integer, com.droiddungeon.player.PlayerStats> stats = new java.util.HashMap<>();
+        List<Player> players = new ArrayList<>();
+        Map<Integer, PlayerStats> stats = new HashMap<>();
         for (var s : sessions.values()) {
             players.add(s.player);
             stats.put(s.player.id(), s.stats);
@@ -124,10 +140,10 @@ public final class ServerGameLoop {
         enemySystem.update(deltaSeconds, players, stats);
     }
 
-    public com.droiddungeon.net.dto.PlayerSnapshotDto playerSnapshotFor(String playerId, long lastProcessedTick) {
+    public PlayerSnapshotDto playerSnapshotFor(String playerId, long lastProcessedTick) {
         var s = sessions.get(playerId);
         if (s == null) return null;
-        return new com.droiddungeon.net.dto.PlayerSnapshotDto(
+        return new PlayerSnapshotDto(
                 playerId,
                 s.player.getRenderX(),
                 s.player.getRenderY(),
@@ -140,27 +156,27 @@ public final class ServerGameLoop {
 
     public Grid grid() { return grid; }
 
-    public java.util.List<com.droiddungeon.items.GroundItem> getGroundItems() { return groundStore.getGroundItems(); }
+    public List<GroundItem> getGroundItems() { return groundStore.getGroundItems(); }
 
-    public com.droiddungeon.systems.MiningSystem.MiningTarget getPlayerMiningTarget(String playerId) {
+    public MiningSystem.MiningTarget getPlayerMiningTarget(String playerId) {
         var s = sessions.get(playerId);
         if (s == null) return null;
         return s.mining.getTarget();
     }
 
-    public com.droiddungeon.systems.EnemySystem enemySystem() { return enemySystem; }
+    public EnemySystem enemySystem() { return enemySystem; }
     private static final class PlayerSession {
         private final String id;
-        private final com.droiddungeon.grid.Player player;
-        private final com.droiddungeon.player.PlayerStats stats;
-        private final com.droiddungeon.systems.CompanionSystem companion;
-        private final com.droiddungeon.inventory.Inventory inventory;
-        private final com.droiddungeon.systems.InventorySystem inventorySystem;
-        private final com.droiddungeon.systems.WeaponSystem weaponSystem;
-        private final com.droiddungeon.systems.MiningSystem mining;
-        private final com.droiddungeon.runtime.GameContext ctx;
+        private final Player player;
+        private final PlayerStats stats;
+        private final CompanionSystem companion;
+        private final Inventory inventory;
+        private final InventorySystem inventorySystem;
+        private final WeaponSystem weaponSystem;
+        private final MiningSystem mining;
+        private final GameContext ctx;
 
-        PlayerSession(String id, com.droiddungeon.grid.Player player, com.droiddungeon.player.PlayerStats stats, com.droiddungeon.systems.CompanionSystem companion, com.droiddungeon.inventory.Inventory inventory, com.droiddungeon.systems.InventorySystem inventorySystem, com.droiddungeon.systems.WeaponSystem weaponSystem, com.droiddungeon.systems.MiningSystem mining, com.droiddungeon.runtime.GameContext ctx) {
+        PlayerSession(String id, Player player, PlayerStats stats, CompanionSystem companion, Inventory inventory, InventorySystem inventorySystem, WeaponSystem weaponSystem, MiningSystem mining, GameContext ctx) {
             this.id = id;
             this.player = player;
             this.stats = stats;
@@ -173,12 +189,12 @@ public final class ServerGameLoop {
         }
 
         public String id() { return id; }
-        public com.droiddungeon.grid.Player player() { return player; }
-        public com.droiddungeon.player.PlayerStats stats() { return stats; }
-        public com.droiddungeon.systems.CompanionSystem companion() { return companion; }
-        public com.droiddungeon.systems.InventorySystem inventorySystem() { return inventorySystem; }
-        public com.droiddungeon.systems.WeaponSystem weaponSystem() { return weaponSystem; }
-        public com.droiddungeon.systems.MiningSystem mining() { return mining; }
-        public com.droiddungeon.runtime.GameContext context() { return ctx; }
+        public Player player() { return player; }
+        public PlayerStats stats() { return stats; }
+        public CompanionSystem companion() { return companion; }
+        public InventorySystem inventorySystem() { return inventorySystem; }
+        public WeaponSystem weaponSystem() { return weaponSystem; }
+        public MiningSystem mining() { return mining; }
+        public GameContext context() { return ctx; }
     }
 }

@@ -8,6 +8,12 @@ import com.droiddungeon.runtime.GameContext;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.WeaponSystem;
+import com.droiddungeon.grid.Player;
+import com.droiddungeon.player.PlayerStats;
+
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap; 
 
 /**
  * Runs per-frame world updates (movement, combat, AI).
@@ -94,8 +100,8 @@ public final class GameUpdater {
 
             if (simulateEnemies) {
                 // singleplayer/simulation mode: update enemies using single-player context
-                java.util.List<com.droiddungeon.grid.Player> players = java.util.List.of(ctx.player());
-                java.util.Map<Integer, com.droiddungeon.player.PlayerStats> stats = new java.util.HashMap<>();
+                List<Player> players = List.of(ctx.player());
+                Map<Integer, PlayerStats> stats = new HashMap<>();
                 stats.put(ctx.player().id(), ctx.playerStats());
                 ctx.enemySystem().update(delta, players, stats);
             }

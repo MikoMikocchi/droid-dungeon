@@ -18,9 +18,13 @@ import com.droiddungeon.input.GameInputController;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.input.InputBindings;
 import com.droiddungeon.input.InputFrame;
+import com.droiddungeon.input.MovementIntent;
+import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.ItemDefinition;
+import com.droiddungeon.items.TextureLoader;
+import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.net.NetworkClientAdapter;
 import com.droiddungeon.net.dto.BlockChangeDto;
@@ -43,7 +47,7 @@ public final class GameRuntime {
     private final GameConfig config;
     private final InputBindings inputBindings;
     private final DebugTextBuilder debugTextBuilder = new DebugTextBuilder();
-    private final com.droiddungeon.items.TextureLoader textureLoader;
+    private final TextureLoader textureLoader;
     private final ClientAssets clientAssets;
     private final boolean networkMode;
     private final NetworkClientAdapter networkClient;
@@ -71,12 +75,12 @@ public final class GameRuntime {
     private long clientTickCounter = 0L;
     private final java.util.Deque<SentInput> pendingInputs = new java.util.ArrayDeque<>();
 
-    private static final record SentInput(long tick, com.droiddungeon.input.MovementIntent movement, com.droiddungeon.input.WeaponInput weapon, boolean drop, boolean pickUp, boolean mine) {}
+    private static final record SentInput(long tick, MovementIntent movement, WeaponInput weapon, boolean drop, boolean pickUp, boolean mine) {}
 
     private Inventory inventory;
     private ItemRegistry itemRegistry;
     private InventorySystem inventorySystem;
-    private com.droiddungeon.items.GroundItemStore groundStore;
+    private GroundItemStore groundStore;
     private EntityWorld entityWorld;
     private EnemySystem enemySystem;
 
@@ -93,7 +97,7 @@ public final class GameRuntime {
         this(config, null, null, null, new NetworkSnapshotBuffer(), false);
     }
 
-    public GameRuntime(GameConfig config, com.droiddungeon.items.TextureLoader textureLoader, ClientAssets clientAssets, NetworkClientAdapter networkClient, NetworkSnapshotBuffer buffer, boolean networkMode) {
+    public GameRuntime(GameConfig config, TextureLoader textureLoader, ClientAssets clientAssets, NetworkClientAdapter networkClient, NetworkSnapshotBuffer buffer, boolean networkMode) {
         this.config = config;
         this.inputBindings = InputBindings.defaults();
         this.textureLoader = textureLoader;
@@ -155,7 +159,7 @@ public final class GameRuntime {
         } else {
             itemRegistry = ItemRegistry.loadDataOnly(java.nio.file.Path.of("items.txt"));
         }
-        com.droiddungeon.items.GroundItemStore gs = new com.droiddungeon.items.GroundItemStore(entityWorld, itemRegistry);
+        GroundItemStore gs = new GroundItemStore(entityWorld, itemRegistry);
         this.groundStore = gs;
         inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld, gs);
         enemySystem = new EnemySystem(grid, worldSeed, entityWorld, gs);
@@ -501,8 +505,5 @@ public final class GameRuntime {
             inv.add(new ItemStack("steel_pickaxe", 1, pickaxeDef.maxDurability()), itemRegistry);
         }
         context.inventorySystem().addGroundStack(context.player().getGridX() + 1, context.player().getGridY(), new ItemStack("test_chip", 5));
-    }
-    private void connectNetworkClient() {
-        // network client should be injected by desktop layer
     }
 }
