@@ -3,24 +3,22 @@ package com.droiddungeon.render;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 
-/**
- * Abstraction over client-side assets so core logic doesn't load textures/fonts directly.
- */
+/** Abstraction over client-side assets so core logic doesn't load textures/fonts directly. */
 public interface ClientAssets extends AutoCloseable {
-    BitmapFont font(int size);
+  BitmapFont font(int size);
 
-    TextureRegion whiteRegion();
+  TextureRegion whiteRegion();
 
-    TextureRegion playerRegion();
+  TextureRegion playerRegion();
 
-    TextureRegion dottyRegion();
+  TextureRegion dottyRegion();
 
-    TextureRegion catsterRegion();
+  TextureRegion catsterRegion();
 
-    TextureRegion floorRegion();
+  TextureRegion floorRegion();
 
-    TextureRegion[] wallAutoTiles();
+  TextureRegion[] wallAutoTiles();
 
-    @Override
-    void close();
+  @Override
+  void close();
 }

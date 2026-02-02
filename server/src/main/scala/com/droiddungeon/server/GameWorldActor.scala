@@ -2,16 +2,13 @@ package com.droiddungeon.server
 
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
-import org.apache.pekko.actor.typed.scaladsl.TimerScheduler
 
 import scala.concurrent.duration._
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 import com.droiddungeon.input.{InputFrame, MovementIntent, WeaponInput}
-import com.droiddungeon.runtime.GameContext
 import com.droiddungeon.items.GroundItem
-import com.droiddungeon.server.JsonProtocol.given
 
 object GameWorldActor {
   sealed trait Command

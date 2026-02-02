@@ -1,271 +1,252 @@
 package com.droiddungeon.render.lighting;
 
+import com.droiddungeon.grid.DungeonGenerator.Room;
+import com.droiddungeon.grid.Grid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import com.droiddungeon.grid.DungeonGenerator.Room;
-import com.droiddungeon.grid.Grid;
-
 /**
- * Manages light sources in the game world.
- * Handles automatic light placement in rooms, torch positioning on walls, etc.
+ * Manages light sources in the game world. Handles automatic light placement in rooms, torch
+ * positioning on walls, etc.
  */
 public class LightingSystem {
-    private final LightRenderer renderer;
-    private final float tileSize;
-    private final Random random;
+  private final LightRenderer renderer;
+  private final float tileSize;
+  private final Random random;
 
-    private float torchSpacing = 4f;  // Minimum tiles between torches (closer = brighter)
-    private float roomLightDensity = 0.20f;  // Chance per valid position
-    private boolean autoPlaceLights = true;
+  private float torchSpacing = 4f; // Minimum tiles between torches (closer = brighter)
+  private float roomLightDensity = 0.20f; // Chance per valid position
+  private boolean autoPlaceLights = true;
 
-    // Track which chunks have had lights generated
-    private final java.util.Set<Long> processedChunks = new java.util.HashSet<>();
+  // Track which chunks have had lights generated
+  private final java.util.Set<Long> processedChunks = new java.util.HashSet<>();
 
-    public LightingSystem(float tileSize, long worldSeed) {
-        this.renderer = new LightRenderer();
-        this.tileSize = tileSize;
-        this.random = new Random(worldSeed ^ 0x4C494748L);
+  public LightingSystem(float tileSize, long worldSeed) {
+    this.renderer = new LightRenderer();
+    this.tileSize = tileSize;
+    this.random = new Random(worldSeed ^ 0x4C494748L);
+  }
+
+  /**
+   * Update the lighting system.
+   *
+   * @param delta time since last frame
+   * @param playerX player world X
+   * @param playerY player world Y
+   */
+  public void update(float delta, float playerX, float playerY) {
+    renderer.setPlayerLight(playerX, playerY, tileSize);
+
+    renderer.update(delta);
+  }
+
+  /** Generate lights for rooms in the visible area. */
+  public void generateLightsForArea(Grid grid, int minX, int minY, int maxX, int maxY) {
+    if (!autoPlaceLights) return;
+
+    List<Room> rooms = grid.getRoomsInArea(minX, minY, maxX, maxY);
+
+    for (Room room : rooms) {
+      long chunkKey = getChunkKey(room.x, room.y);
+      if (processedChunks.contains(chunkKey)) {
+        continue;
+      }
+      processedChunks.add(chunkKey);
+
+      generateRoomLights(grid, room);
+    }
+  }
+
+  private long getChunkKey(int x, int y) {
+    int chunkX = x / 32; // Approximate chunk coordinate
+    int chunkY = y / 32;
+    return ((long) chunkX << 32) | (chunkY & 0xFFFFFFFFL);
+  }
+
+  /** Generate appropriate lights for a room based on its type. */
+  private void generateRoomLights(Grid grid, Room room) {
+    // Seed random for reproducible light placement
+    random.setSeed(room.x * 73856093L ^ room.y * 19349663L);
+
+    switch (room.type) {
+      case SAFE -> // Safe rooms get more lighting
+          generateSafeRoomLights(grid, room);
+      case DANGER -> // Danger rooms are darker with fewer lights
+          generateDangerRoomLights(grid, room);
+      default -> generateDefaultLights(grid, room);
+    }
+  }
+
+  /** Generate lights for safe rooms - well lit with lanterns. */
+  private void generateSafeRoomLights(Grid grid, Room room) {
+    float centerX = (room.x + room.width * 0.5f) * tileSize;
+    float centerY = (room.y + room.height * 0.5f) * tileSize;
+
+    Light centerLight = LightType.LANTERN.createLight(centerX, centerY, tileSize);
+    centerLight.setRadius(centerLight.getRadius() * 1.45f); // Larger for safe rooms
+    centerLight.setIntensity(centerLight.getIntensity() * 1.1f);
+    renderer.addLight(centerLight);
+
+    // Add a soft ambient fill so the entire room is readable
+    Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+    ambient.setRadius(ambient.getRadius() * 1.35f);
+    ambient.setIntensity(ambient.getIntensity() * 1.05f);
+    renderer.addLight(ambient);
+
+    // Add wall torches if room is large enough
+    if (room.width >= 6 && room.height >= 6) {
+      addWallTorches(grid, room, 0.55f); // denser coverage
+    }
+  }
+
+  /** Generate lights for danger rooms - sparse, moody lighting. */
+  private void generateDangerRoomLights(Grid grid, Room room) {
+    // Fewer lights in danger rooms
+    float centerX = (room.x + room.width * 0.5f) * tileSize;
+    float centerY = (room.y + room.height * 0.5f) * tileSize;
+
+    // Small chance for a central fire
+    if (random.nextFloat() < 0.25f && room.width >= 5 && room.height >= 5) {
+      Light fire = LightType.CAMPFIRE.createLight(centerX, centerY, tileSize);
+      fire.setRadius(fire.getRadius() * 0.95f);
+      fire.setIntensity(fire.getIntensity() * 1.1f);
+      renderer.addLight(fire);
     }
 
-    /**
-     * Update the lighting system.
-     * @param delta time since last frame
-     * @param playerX player world X
-     * @param playerY player world Y
-     */
-    public void update(float delta, float playerX, float playerY) {
-        renderer.setPlayerLight(playerX, playerY, tileSize);
-
-        renderer.update(delta);
+    // Sparse wall torches but a touch brighter than before
+    if (room.width >= 5 || room.height >= 5) {
+      addWallTorches(grid, room, 0.28f); // more coverage for visibility
     }
 
-    /**
-     * Generate lights for rooms in the visible area.
-     */
-    public void generateLightsForArea(Grid grid, int minX, int minY, int maxX, int maxY) {
-        if (!autoPlaceLights) return;
+    // Add a very soft ambient wash in large danger rooms to avoid pitch black corners
+    if (room.width * room.height >= 36) {
+      Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+      ambient.setRadius(ambient.getRadius() * 1.1f);
+      ambient.setIntensity(ambient.getIntensity() * 0.85f);
+      renderer.addLight(ambient);
+    }
+  }
 
-        List<Room> rooms = grid.getRoomsInArea(minX, minY, maxX, maxY);
+  /** Generate default lighting. */
+  private void generateDefaultLights(Grid grid, Room room) {
+    if (room.width >= 4 && room.height >= 4) {
+      addWallTorches(grid, room, 0.35f);
+      // Small ambient center to keep hallways readable
+      float centerX = (room.x + room.width * 0.5f) * tileSize;
+      float centerY = (room.y + room.height * 0.5f) * tileSize;
+      Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
+      ambient.setRadius(ambient.getRadius() * 1.0f);
+      ambient.setIntensity(ambient.getIntensity() * 0.8f);
+      renderer.addLight(ambient);
+    }
+  }
 
-        for (Room room : rooms) {
-            long chunkKey = getChunkKey(room.x, room.y);
-            if (processedChunks.contains(chunkKey)) {
-                continue;
-            }
-            processedChunks.add(chunkKey);
+  /**
+   * Add torches along walls of a room.
+   *
+   * @param coverage 0-1 how many potential positions get torches
+   */
+  private void addWallTorches(Grid grid, Room room, float coverage) {
+    List<int[]> wallPositions = findWallAdjacentPositions(grid, room);
 
-            generateRoomLights(grid, room);
+    java.util.Collections.shuffle(wallPositions, random);
+
+    int torchCount = Math.max(1, (int) (wallPositions.size() * coverage));
+    int placed = 0;
+
+    List<float[]> placedPositions = new ArrayList<>();
+
+    for (int[] pos : wallPositions) {
+      if (placed >= torchCount) break;
+
+      float worldX = (pos[0] + 0.5f) * tileSize;
+      float worldY = (pos[1] + 0.5f) * tileSize;
+
+      boolean tooClose = false;
+      for (float[] existing : placedPositions) {
+        float dx = worldX - existing[0];
+        float dy = worldY - existing[1];
+        if (dx * dx + dy * dy < torchSpacing * torchSpacing * tileSize * tileSize) {
+          tooClose = true;
+          break;
         }
+      }
+
+      if (!tooClose) {
+        Light torch = LightType.TORCH.createLight(worldX, worldY, tileSize);
+        torch.setFlickerSpeed(torch.getFlickerSpeed() * (0.8f + random.nextFloat() * 0.4f));
+        torch.setIntensity(torch.getIntensity() * (0.85f + random.nextFloat() * 0.15f));
+        renderer.addLight(torch);
+
+        placedPositions.add(new float[] {worldX, worldY});
+        placed++;
+      }
     }
+  }
 
-    private long getChunkKey(int x, int y) {
-        int chunkX = x / 32;  // Approximate chunk coordinate
-        int chunkY = y / 32;
-        return ((long) chunkX << 32) | (chunkY & 0xFFFFFFFFL);
-    }
+  /** Find floor positions adjacent to walls (good spots for torches). */
+  private List<int[]> findWallAdjacentPositions(Grid grid, Room room) {
+    List<int[]> positions = new ArrayList<>();
 
-    /**
-     * Generate appropriate lights for a room based on its type.
-     */
-    private void generateRoomLights(Grid grid, Room room) {
-        // Seed random for reproducible light placement
-        random.setSeed(room.x * 73856093L ^ room.y * 19349663L);
-
-        switch (room.type) {
-            case SAFE -> // Safe rooms get more lighting
-                generateSafeRoomLights(grid, room);
-            case DANGER -> // Danger rooms are darker with fewer lights
-                generateDangerRoomLights(grid, room);
-            default -> generateDefaultLights(grid, room);
+    for (int x = room.x + 1; x < room.x + room.width - 1; x++) {
+      for (int y = room.y + 1; y < room.y + room.height - 1; y++) {
+        if (!grid.hasBlock(x, y)) {
+          if (grid.hasBlock(x - 1, y)
+              || grid.hasBlock(x + 1, y)
+              || grid.hasBlock(x, y - 1)
+              || grid.hasBlock(x, y + 1)) {
+            positions.add(new int[] {x, y});
+          }
         }
+      }
     }
 
-    /**
-     * Generate lights for safe rooms - well lit with lanterns.
-     */
-    private void generateSafeRoomLights(Grid grid, Room room) {
-        float centerX = (room.x + room.width * 0.5f) * tileSize;
-        float centerY = (room.y + room.height * 0.5f) * tileSize;
+    return positions;
+  }
 
-        Light centerLight = LightType.LANTERN.createLight(centerX, centerY, tileSize);
-        centerLight.setRadius(centerLight.getRadius() * 1.45f);  // Larger for safe rooms
-        centerLight.setIntensity(centerLight.getIntensity() * 1.1f);
-        renderer.addLight(centerLight);
+  /** Manually add a light at a specific position. */
+  public Light addLight(LightType type, float worldX, float worldY) {
+    Light light = type.createLight(worldX, worldY, tileSize);
+    renderer.addLight(light);
+    return light;
+  }
 
-        // Add a soft ambient fill so the entire room is readable
-        Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
-        ambient.setRadius(ambient.getRadius() * 1.35f);
-        ambient.setIntensity(ambient.getIntensity() * 1.05f);
-        renderer.addLight(ambient);
+  /** Add a custom light. */
+  public void addLight(Light light) {
+    renderer.addLight(light);
+  }
 
-        // Add wall torches if room is large enough
-        if (room.width >= 6 && room.height >= 6) {
-            addWallTorches(grid, room, 0.55f);  // denser coverage
-        }
-    }
+  /** Remove a light. */
+  public void removeLight(Light light) {
+    renderer.removeLight(light);
+  }
 
-    /**
-     * Generate lights for danger rooms - sparse, moody lighting.
-     */
-    private void generateDangerRoomLights(Grid grid, Room room) {
-        // Fewer lights in danger rooms
-        float centerX = (room.x + room.width * 0.5f) * tileSize;
-        float centerY = (room.y + room.height * 0.5f) * tileSize;
+  /** Get the renderer for direct access. */
+  public LightRenderer getRenderer() {
+    return renderer;
+  }
 
-        // Small chance for a central fire
-        if (random.nextFloat() < 0.25f && room.width >= 5 && room.height >= 5) {
-            Light fire = LightType.CAMPFIRE.createLight(centerX, centerY, tileSize);
-            fire.setRadius(fire.getRadius() * 0.95f);
-            fire.setIntensity(fire.getIntensity() * 1.1f);
-            renderer.addLight(fire);
-        }
+  /** Reset processed chunks (for world regeneration). */
+  public void resetGeneratedLights() {
+    processedChunks.clear();
+    renderer.clearLights();
+  }
 
-        // Sparse wall torches but a touch brighter than before
-        if (room.width >= 5 || room.height >= 5) {
-            addWallTorches(grid, room, 0.28f);  // more coverage for visibility
-        }
+  public void setTorchSpacing(float tiles) {
+    this.torchSpacing = Math.max(2f, tiles);
+  }
 
-        // Add a very soft ambient wash in large danger rooms to avoid pitch black corners
-        if (room.width * room.height >= 36) {
-            Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
-            ambient.setRadius(ambient.getRadius() * 1.1f);
-            ambient.setIntensity(ambient.getIntensity() * 0.85f);
-            renderer.addLight(ambient);
-        }
-    }
+  public void setRoomLightDensity(float density) {
+    this.roomLightDensity = Math.max(0f, Math.min(1f, density));
+  }
 
-    /**
-     * Generate default lighting.
-     */
-    private void generateDefaultLights(Grid grid, Room room) {
-        if (room.width >= 4 && room.height >= 4) {
-            addWallTorches(grid, room, 0.35f);
-            // Small ambient center to keep hallways readable
-            float centerX = (room.x + room.width * 0.5f) * tileSize;
-            float centerY = (room.y + room.height * 0.5f) * tileSize;
-            Light ambient = LightType.AMBIENT.createLight(centerX, centerY, tileSize);
-            ambient.setRadius(ambient.getRadius() * 1.0f);
-            ambient.setIntensity(ambient.getIntensity() * 0.8f);
-            renderer.addLight(ambient);
-        }
-    }
+  public void setAutoPlaceLights(boolean auto) {
+    this.autoPlaceLights = auto;
+  }
 
-    /**
-     * Add torches along walls of a room.
-     * @param coverage 0-1 how many potential positions get torches
-     */
-    private void addWallTorches(Grid grid, Room room, float coverage) {
-        List<int[]> wallPositions = findWallAdjacentPositions(grid, room);
-
-        java.util.Collections.shuffle(wallPositions, random);
-
-        int torchCount = Math.max(1, (int) (wallPositions.size() * coverage));
-        int placed = 0;
-
-        List<float[]> placedPositions = new ArrayList<>();
-
-        for (int[] pos : wallPositions) {
-            if (placed >= torchCount) break;
-
-            float worldX = (pos[0] + 0.5f) * tileSize;
-            float worldY = (pos[1] + 0.5f) * tileSize;
-
-            boolean tooClose = false;
-            for (float[] existing : placedPositions) {
-                float dx = worldX - existing[0];
-                float dy = worldY - existing[1];
-                if (dx * dx + dy * dy < torchSpacing * torchSpacing * tileSize * tileSize) {
-                    tooClose = true;
-                    break;
-                }
-            }
-
-            if (!tooClose) {
-                Light torch = LightType.TORCH.createLight(worldX, worldY, tileSize);
-                torch.setFlickerSpeed(torch.getFlickerSpeed() * (0.8f + random.nextFloat() * 0.4f));
-                torch.setIntensity(torch.getIntensity() * (0.85f + random.nextFloat() * 0.15f));
-                renderer.addLight(torch);
-
-                placedPositions.add(new float[]{worldX, worldY});
-                placed++;
-            }
-        }
-    }
-
-    /**
-     * Find floor positions adjacent to walls (good spots for torches).
-     */
-    private List<int[]> findWallAdjacentPositions(Grid grid, Room room) {
-        List<int[]> positions = new ArrayList<>();
-
-        for (int x = room.x + 1; x < room.x + room.width - 1; x++) {
-            for (int y = room.y + 1; y < room.y + room.height - 1; y++) {
-                if (!grid.hasBlock(x, y)) {
-                    if (grid.hasBlock(x - 1, y) || grid.hasBlock(x + 1, y) ||
-                        grid.hasBlock(x, y - 1) || grid.hasBlock(x, y + 1)) {
-                        positions.add(new int[]{x, y});
-                    }
-                }
-            }
-        }
-
-        return positions;
-    }
-
-    /**
-     * Manually add a light at a specific position.
-     */
-    public Light addLight(LightType type, float worldX, float worldY) {
-        Light light = type.createLight(worldX, worldY, tileSize);
-        renderer.addLight(light);
-        return light;
-    }
-
-    /**
-     * Add a custom light.
-     */
-    public void addLight(Light light) {
-        renderer.addLight(light);
-    }
-
-    /**
-     * Remove a light.
-     */
-    public void removeLight(Light light) {
-        renderer.removeLight(light);
-    }
-
-    /**
-     * Get the renderer for direct access.
-     */
-    public LightRenderer getRenderer() {
-        return renderer;
-    }
-
-    /**
-     * Reset processed chunks (for world regeneration).
-     */
-    public void resetGeneratedLights() {
-        processedChunks.clear();
-        renderer.clearLights();
-    }
-
-    public void setTorchSpacing(float tiles) {
-        this.torchSpacing = Math.max(2f, tiles);
-    }
-
-    public void setRoomLightDensity(float density) {
-        this.roomLightDensity = Math.max(0f, Math.min(1f, density));
-    }
-
-    public void setAutoPlaceLights(boolean auto) {
-        this.autoPlaceLights = auto;
-    }
-
-    public void dispose() {
-        renderer.dispose();
-        processedChunks.clear();
-    }
+  public void dispose() {
+    renderer.dispose();
+    processedChunks.clear();
+  }
 }

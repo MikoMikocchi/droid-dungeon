@@ -6,90 +6,92 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.ui.HudRenderer;
 
-/**
- * Converts raw input into high-level, bindable actions and UI hit tests.
- */
+/** Converts raw input into high-level, bindable actions and UI hit tests. */
 public final class GameInputController {
-    private final InputBindings bindings;
-    private final HudRenderer hudRenderer;
+  private final InputBindings bindings;
+  private final HudRenderer hudRenderer;
 
-    public GameInputController(InputBindings bindings, HudRenderer hudRenderer) {
-        this.bindings = bindings;
-        this.hudRenderer = hudRenderer;
-    }
+  public GameInputController(InputBindings bindings, HudRenderer hudRenderer) {
+    this.bindings = bindings;
+    this.hudRenderer = hudRenderer;
+  }
 
-    public InputFrame collect(Viewport uiViewport, Viewport worldViewport, InventorySystem inventorySystem) {
-        // hotbar selection / inventory toggle are handled inside the system for now
-        inventorySystem.updateInput();
+  public InputFrame collect(
+      Viewport uiViewport, Viewport worldViewport, InventorySystem inventorySystem) {
+    // hotbar selection / inventory toggle are handled inside the system for now
+    inventorySystem.updateInput();
 
-        int recipeCount = inventorySystem.getCraftingSystem().getRecipes().size();
-        int slotUnderCursor = hudRenderer.hitTestSlot(
-                uiViewport,
-                Gdx.input.getX(),
-                Gdx.input.getY(),
-                inventorySystem.isInventoryOpen(),
-                recipeCount
-        );
-        var craftHit = hudRenderer.hitTestCrafting(
-                uiViewport,
-                Gdx.input.getX(),
-                Gdx.input.getY(),
-                inventorySystem.isInventoryOpen(),
-                recipeCount
-        );
-        int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
-        int hoveredRecipe = inventorySystem.isInventoryOpen() ? craftHit.iconIndex() : -1;
-        boolean slotClicked = Gdx.input.justTouched() && slotUnderCursor != -1;
-        boolean recipeSelectClicked = Gdx.input.justTouched() && craftHit.iconIndex() != -1;
-        boolean craftClicked = Gdx.input.justTouched() && craftHit.onCraftButton();
-        boolean pointerOnUi = slotUnderCursor != -1 || craftHit.insidePanel();
+    int recipeCount = inventorySystem.getCraftingSystem().getRecipes().size();
+    int slotUnderCursor =
+        hudRenderer.hitTestSlot(
+            uiViewport,
+            Gdx.input.getX(),
+            Gdx.input.getY(),
+            inventorySystem.isInventoryOpen(),
+            recipeCount);
+    var craftHit =
+        hudRenderer.hitTestCrafting(
+            uiViewport,
+            Gdx.input.getX(),
+            Gdx.input.getY(),
+            inventorySystem.isInventoryOpen(),
+            recipeCount);
+    int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
+    int hoveredRecipe = inventorySystem.isInventoryOpen() ? craftHit.iconIndex() : -1;
+    boolean slotClicked = Gdx.input.justTouched() && slotUnderCursor != -1;
+    boolean recipeSelectClicked = Gdx.input.justTouched() && craftHit.iconIndex() != -1;
+    boolean craftClicked = Gdx.input.justTouched() && craftHit.onCraftButton();
+    boolean pointerOnUi = slotUnderCursor != -1 || craftHit.insidePanel();
 
-        boolean dropRequested = bindings.isJustPressed(InputAction.DROP_ITEM);
-        boolean pickUpRequested = bindings.isJustPressed(InputAction.PICK_UP_ITEM);
-        boolean mapToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_MAP);
-        boolean mapCloseRequested = bindings.isJustPressed(InputAction.CLOSE_MAP);
-        boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
-        // Hold left mouse to mine; keep reporting while pressed for hold-to-break behavior.
-        boolean mineRequested = Gdx.input.isButtonPressed(Input.Buttons.LEFT) && !pointerOnUi;
-        boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
+    boolean dropRequested = bindings.isJustPressed(InputAction.DROP_ITEM);
+    boolean pickUpRequested = bindings.isJustPressed(InputAction.PICK_UP_ITEM);
+    boolean mapToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_MAP);
+    boolean mapCloseRequested = bindings.isJustPressed(InputAction.CLOSE_MAP);
+    boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
+    // Hold left mouse to mine; keep reporting while pressed for hold-to-break behavior.
+    boolean mineRequested = Gdx.input.isButtonPressed(Input.Buttons.LEFT) && !pointerOnUi;
+    boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
 
-        MovementIntent movementIntent = new MovementIntent(
-                Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A),
-                Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D),
-                Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W),
-                Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S),
-                Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A),
-                Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D),
-                Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W),
-                Gdx.input.isKeyJustPressed(Input.Keys.DOWN) || Gdx.input.isKeyJustPressed(Input.Keys.S)
-        );
+    MovementIntent movementIntent =
+        new MovementIntent(
+            Gdx.input.isKeyPressed(Input.Keys.LEFT) || Gdx.input.isKeyPressed(Input.Keys.A),
+            Gdx.input.isKeyPressed(Input.Keys.RIGHT) || Gdx.input.isKeyPressed(Input.Keys.D),
+            Gdx.input.isKeyPressed(Input.Keys.UP) || Gdx.input.isKeyPressed(Input.Keys.W),
+            Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S),
+            Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A),
+            Gdx.input.isKeyJustPressed(Input.Keys.RIGHT)
+                || Gdx.input.isKeyJustPressed(Input.Keys.D),
+            Gdx.input.isKeyJustPressed(Input.Keys.UP) || Gdx.input.isKeyJustPressed(Input.Keys.W),
+            Gdx.input.isKeyJustPressed(Input.Keys.DOWN)
+                || Gdx.input.isKeyJustPressed(Input.Keys.S));
 
-        var mouseWorld = worldViewport.unproject(new com.badlogic.gdx.math.Vector2(Gdx.input.getX(), Gdx.input.getY()));
-        WeaponInput weaponInput = new WeaponInput(
-                Gdx.input.isButtonJustPressed(Input.Buttons.LEFT),
-                Gdx.input.isButtonPressed(Input.Buttons.LEFT),
-                mouseWorld.x,
-                mouseWorld.y
-        );
+    var mouseWorld =
+        worldViewport.unproject(
+            new com.badlogic.gdx.math.Vector2(Gdx.input.getX(), Gdx.input.getY()));
+    WeaponInput weaponInput =
+        new WeaponInput(
+            Gdx.input.isButtonJustPressed(Input.Buttons.LEFT),
+            Gdx.input.isButtonPressed(Input.Buttons.LEFT),
+            mouseWorld.x,
+            mouseWorld.y);
 
-        return new InputFrame(
-                slotUnderCursor,
-                hoveredSlot,
-                hoveredRecipe,
-                recipeSelectClicked ? craftHit.iconIndex() : -1,
-                craftHit.onCraftButton(),
-                craftClicked,
-                pointerOnUi,
-                slotClicked,
-                dropRequested,
-                pickUpRequested,
-                mapToggleRequested,
-                mapCloseRequested,
-                restartRequested,
-                mineRequested,
-                debugToggleRequested,
-                movementIntent,
-                weaponInput
-        );
-    }
+    return new InputFrame(
+        slotUnderCursor,
+        hoveredSlot,
+        hoveredRecipe,
+        recipeSelectClicked ? craftHit.iconIndex() : -1,
+        craftHit.onCraftButton(),
+        craftClicked,
+        pointerOnUi,
+        slotClicked,
+        dropRequested,
+        pickUpRequested,
+        mapToggleRequested,
+        mapCloseRequested,
+        restartRequested,
+        mineRequested,
+        debugToggleRequested,
+        movementIntent,
+        weaponInput);
+  }
 }

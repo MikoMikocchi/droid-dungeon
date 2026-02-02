@@ -1,6 +1,7 @@
 plugins {
     scala
     application
+    id("io.github.cosmicsilence.scalafix") version "0.2.6"
 }
 
 repositories {
@@ -33,7 +34,11 @@ application {
 
 tasks.withType<ScalaCompile>().configureEach {
     scalaCompileOptions.apply {
-        additionalParameters = listOf("-deprecation", "-unchecked")
+        additionalParameters = listOf(
+            "-deprecation",
+            "-unchecked",
+            "-Wunused:all" // required for scalafix RemoveUnused rule on Scala 3.3.4+
+        )
     }
 }
 
