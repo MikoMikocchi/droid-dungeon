@@ -55,6 +55,7 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
         WelcomeDto welcome = cbor.readValue(payload, WelcomeDto.class);
         if (welcome != null && welcome.playerId() != null && !welcome.playerId().isEmpty()) {
           playerId = welcome.playerId();
+          PlayerIdStore.save(playerId);
         }
         return;
       }

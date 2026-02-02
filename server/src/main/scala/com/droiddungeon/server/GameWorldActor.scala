@@ -56,9 +56,8 @@ object GameWorldActor {
         case RegisterSession(playerId, ref) =>
           val newSessions = sessions + (playerId -> ref)
           ctx.log.info("Session registered {} as player {}", ref, playerId)
-          // initialize processed tick to -1
-          val newProcessed = processedTicks + (playerId -> -1L)
-          loop.registerPlayer(playerId)
+          val restoredTick = loop.registerPlayer(playerId)
+          val newProcessed = processedTicks + (playerId -> restoredTick)
           val enemiesAll =
             loop.enemySystem().getEnemies().asScala.toSeq.map { e =>
               EnemySnapshot(
@@ -118,7 +117,10 @@ object GameWorldActor {
           }
           // unregister player from loop
           val removedPlayers = sessions.keySet.diff(filtered.keySet)
-          removedPlayers.foreach(pid => loop.unregisterPlayer(pid))
+          removedPlayers.foreach { pid =>
+            loop.savePlayerState(pid, processedTicks.getOrElse(pid, -1L))
+            loop.unregisterPlayer(pid)
+          }
           active(
             loop,
             filtered,

@@ -39,9 +39,12 @@ import scala.concurrent.duration.*
 import scala.util.Try
 
 object HttpServer:
-  private def websocketFlow(world: org.apache.pekko.actor.typed.ActorRef[GameWorldActor.Command])(using system: ActorSystem[Nothing]): Flow[Message, Message, Any] =
+  private def websocketFlow(
+      world: org.apache.pekko.actor.typed.ActorRef[GameWorldActor.Command],
+      requestedPlayerId: Option[String]
+  )(using system: ActorSystem[Nothing]): Flow[Message, Message, Any] =
     import system.executionContext
-    val playerId = java.util.UUID.randomUUID().toString
+    val playerId = requestedPlayerId.filter(id => id != null && id.nonEmpty).getOrElse(java.util.UUID.randomUUID().toString)
     val cbor = new ObjectMapper(new CBORFactory()).findAndRegisterModules()
 
     val sink: Sink[Message, Any] = Flow[Message]
@@ -202,7 +205,9 @@ object HttpServer:
         },
         tickRoute.getOrElse(reject),
         path("ws") {
-          handleWebSocketMessages(websocketFlow(worldActor)(using system))
+          parameter("playerId".?) { pid =>
+            handleWebSocketMessages(websocketFlow(worldActor, pid)(using system))
+          }
         }
       )
 
