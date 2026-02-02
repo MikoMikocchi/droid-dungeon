@@ -1,5 +1,10 @@
 package com.droiddungeon.server;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.droiddungeon.config.GameConfig;
 import com.droiddungeon.control.GameUpdater;
 import com.droiddungeon.grid.Grid;
@@ -14,10 +19,6 @@ import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.MiningSystem;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Minimal headless loop for server tick: does not rely on Gdx.graphics/Gdx.input. Adapts input DTOs

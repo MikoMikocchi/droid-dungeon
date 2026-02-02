@@ -1,10 +1,11 @@
 package com.droiddungeon.server;
 
+import java.util.List;
+
 import com.droiddungeon.items.GroundItem;
 import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.net.dto.PlayerSnapshotDto;
 import com.droiddungeon.systems.MiningSystem;
-import java.util.List;
 
 public final class SnapshotFacade {
   private final PlayerSessionStore sessionStore;
