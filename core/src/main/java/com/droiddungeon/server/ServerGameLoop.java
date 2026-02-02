@@ -2,28 +2,18 @@ package com.droiddungeon.server;
 
 import com.droiddungeon.config.GameConfig;
 import com.droiddungeon.control.GameUpdater;
-import com.droiddungeon.entity.EntityWorld;
-import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.input.HeldMovementController;
 import com.droiddungeon.input.InputFrame;
-import com.droiddungeon.inventory.Inventory;
-import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.items.GroundItem;
-import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.net.dto.PlayerSnapshotDto;
 import com.droiddungeon.player.PlayerStats;
-import com.droiddungeon.runtime.GameContext;
-import com.droiddungeon.runtime.GameContextFactory;
 import com.droiddungeon.runtime.GameUpdateResult;
 import com.droiddungeon.systems.CameraController;
-import com.droiddungeon.systems.CompanionSystem;
 import com.droiddungeon.systems.EnemySystem;
-import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.MiningSystem;
-import com.droiddungeon.systems.WeaponSystem;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,52 +24,25 @@ import java.util.Map;
  * (InputFrame) to GameUpdater and provides a state snapshot.
  */
 public final class ServerGameLoop {
-  private final GameConfig config;
   private final long worldSeed;
   private final GameUpdater updater;
-  private final GameContextFactory contextFactory;
   private final EnemySystem enemySystem;
   private final HeldMovementController movementController;
-
-  // world-shared state
   private final Grid grid;
-  private final EntityWorld entityWorld;
-  private final ItemRegistry itemRegistry;
-  private final GroundItemStore groundStore;
-
-  // per-player sessions
-  private final Map<String, GameContextFactory.PlayerSession> sessions = new HashMap<>();
-  private final Map<String, PlayerSave> savedPlayers = new HashMap<>();
+  private final PlayerSessionStore sessionStore;
+  private final SnapshotFacade snapshotFacade;
 
   public ServerGameLoop(GameConfig config, ItemRegistry itemRegistry, long worldSeed) {
-    this.config = config;
     this.worldSeed = worldSeed;
     this.movementController = new HeldMovementController();
 
-    DungeonGenerator.DungeonLayout layout =
-        DungeonGenerator.generateInfinite(config.tileSize(), worldSeed);
-    this.grid = layout.grid();
-    int spawnX = layout.spawnX();
-    int spawnY = layout.spawnY();
-
-    this.entityWorld = new EntityWorld();
-    this.itemRegistry = itemRegistry;
-    this.groundStore = new GroundItemStore(entityWorld, itemRegistry);
-
-    // enemy system is world-shared
-    this.enemySystem = new EnemySystem(grid, worldSeed, entityWorld, groundStore);
-
-    this.contextFactory =
-        new GameContextFactory(
-            config,
-            grid,
-            spawnX,
-            spawnY,
-            worldSeed,
-            itemRegistry,
-            entityWorld,
-            enemySystem,
-            groundStore);
+    WorldInitializer.WorldState worldState =
+        new WorldInitializer().initialize(config, itemRegistry, worldSeed);
+    this.grid = worldState.grid();
+    this.enemySystem = worldState.enemySystem();
+    this.sessionStore =
+        new PlayerSessionStore(worldState.contextFactory(), worldState.entityWorld());
+    this.snapshotFacade = new SnapshotFacade(sessionStore, worldState.groundStore());
 
     // camera and viewport are not needed for the server, passing null
     CameraController cameraController = null;
@@ -96,29 +59,17 @@ public final class ServerGameLoop {
    * @return last processed tick if a saved state exists, otherwise -1
    */
   public long registerPlayer(String playerId) {
-    if (sessions.containsKey(playerId)) {
-      return savedPlayers.getOrDefault(playerId, PlayerSave.EMPTY).lastProcessedTick;
-    }
-    var sf = contextFactory.createPlayerSession(playerId);
-    var saved = savedPlayers.remove(playerId);
-    applySavedState(sf, saved);
-    sessions.put(playerId, sf);
-    entityWorld.add(sf.player);
-    entityWorld.add(sf.companion);
-    return saved != null ? saved.lastProcessedTick : -1L;
+    return sessionStore.registerPlayer(playerId);
   }
 
   /** Unregister player and clean up entities */
   public void unregisterPlayer(String playerId) {
-    var s = sessions.remove(playerId);
-    if (s == null) return;
-    entityWorld.remove(s.player);
-    entityWorld.remove(s.companion);
+    sessionStore.unregisterPlayer(playerId);
   }
 
   /** Perform one player-specific simulation step (does not update global AI; see updateGlobal). */
   public GameUpdateResult tickForPlayer(String playerId, InputFrame input, float deltaSeconds) {
-    var s = sessions.get(playerId);
+    var s = sessionStore.getSession(playerId);
     if (s == null) return null;
     return updater.update(
         deltaSeconds,
@@ -136,7 +87,7 @@ public final class ServerGameLoop {
     // collect players for AI usage
     List<Player> players = new ArrayList<>();
     Map<Integer, PlayerStats> stats = new HashMap<>();
-    for (var s : sessions.values()) {
+    for (var s : sessionStore.sessions()) {
       players.add(s.player);
       stats.put(s.player.id(), s.stats);
     }
@@ -144,16 +95,7 @@ public final class ServerGameLoop {
   }
 
   public PlayerSnapshotDto playerSnapshotFor(String playerId, long lastProcessedTick) {
-    var s = sessions.get(playerId);
-    if (s == null) return null;
-    return new PlayerSnapshotDto(
-        playerId,
-        s.player.getRenderX(),
-        s.player.getRenderY(),
-        s.player.getGridX(),
-        s.player.getGridY(),
-        s.stats.getHealth(),
-        lastProcessedTick);
+    return snapshotFacade.playerSnapshotFor(playerId, lastProcessedTick);
   }
 
   public Grid grid() {
@@ -161,13 +103,11 @@ public final class ServerGameLoop {
   }
 
   public List<GroundItem> getGroundItems() {
-    return groundStore.getGroundItems();
+    return snapshotFacade.getGroundItems();
   }
 
   public MiningSystem.MiningTarget getPlayerMiningTarget(String playerId) {
-    var s = sessions.get(playerId);
-    if (s == null) return null;
-    return s.mining.getTarget();
+    return snapshotFacade.getPlayerMiningTarget(playerId);
   }
 
   public EnemySystem enemySystem() {
@@ -176,119 +116,6 @@ public final class ServerGameLoop {
 
   /** Persist current session state for reconnects (in-memory only). */
   public void savePlayerState(String playerId, long lastProcessedTick) {
-    var session = sessions.get(playerId);
-    if (session == null) return;
-    savedPlayers.put(playerId, PlayerSave.snapshot(session, lastProcessedTick));
-  }
-
-  private static void applySavedState(GameContextFactory.PlayerSession session, PlayerSave saved) {
-    if (saved == null) return;
-    session.player.setServerPosition(saved.renderX, saved.renderY, saved.gridX, saved.gridY);
-    session.stats.setHealth(saved.health);
-
-    Inventory inv = session.inventory;
-    for (int i = 0; i < inv.size(); i++) {
-      inv.set(i, null);
-    }
-    if (saved.inventory != null) {
-      for (int i = 0; i < Math.min(inv.size(), saved.inventory.length); i++) {
-        inv.set(i, saved.inventory[i]);
-      }
-    }
-  }
-
-  private record PlayerSave(
-      float renderX,
-      float renderY,
-      int gridX,
-      int gridY,
-      float health,
-      ItemStack[] inventory,
-      long lastProcessedTick) {
-    private static final PlayerSave EMPTY = new PlayerSave(0f, 0f, 0, 0, 0f, new ItemStack[0], -1L);
-
-    private static PlayerSave snapshot(
-        GameContextFactory.PlayerSession session, long lastProcessedTick) {
-      ItemStack[] items = new ItemStack[session.inventory.size()];
-      for (int i = 0; i < items.length; i++) {
-        ItemStack stack = session.inventory.get(i);
-        if (stack != null) {
-          items[i] = new ItemStack(stack.itemId(), stack.count(), stack.durability());
-        }
-      }
-      return new PlayerSave(
-          session.player.getRenderX(),
-          session.player.getRenderY(),
-          session.player.getGridX(),
-          session.player.getGridY(),
-          session.stats.getHealth(),
-          items,
-          lastProcessedTick);
-    }
-  }
-
-  private static final class PlayerSession {
-    private final String id;
-    private final Player player;
-    private final PlayerStats stats;
-    private final CompanionSystem companion;
-    private final Inventory inventory;
-    private final InventorySystem inventorySystem;
-    private final WeaponSystem weaponSystem;
-    private final MiningSystem mining;
-    private final GameContext ctx;
-
-    PlayerSession(
-        String id,
-        Player player,
-        PlayerStats stats,
-        CompanionSystem companion,
-        Inventory inventory,
-        InventorySystem inventorySystem,
-        WeaponSystem weaponSystem,
-        MiningSystem mining,
-        GameContext ctx) {
-      this.id = id;
-      this.player = player;
-      this.stats = stats;
-      this.companion = companion;
-      this.inventory = inventory;
-      this.inventorySystem = inventorySystem;
-      this.weaponSystem = weaponSystem;
-      this.mining = mining;
-      this.ctx = ctx;
-    }
-
-    public String id() {
-      return id;
-    }
-
-    public Player player() {
-      return player;
-    }
-
-    public PlayerStats stats() {
-      return stats;
-    }
-
-    public CompanionSystem companion() {
-      return companion;
-    }
-
-    public InventorySystem inventorySystem() {
-      return inventorySystem;
-    }
-
-    public WeaponSystem weaponSystem() {
-      return weaponSystem;
-    }
-
-    public MiningSystem mining() {
-      return mining;
-    }
-
-    public GameContext context() {
-      return ctx;
-    }
+    sessionStore.savePlayerState(playerId, lastProcessedTick);
   }
 }
