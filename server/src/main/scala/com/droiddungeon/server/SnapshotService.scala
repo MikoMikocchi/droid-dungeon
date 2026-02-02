@@ -39,7 +39,8 @@ final case class SnapshotService(
       )
     val next = copy(
       blockCacheByPlayer = blockCacheByPlayer + (playerId -> updatedBlockCache),
-      groundCacheByPlayer = groundCacheByPlayer + (playerId -> updatedGroundCache)
+      groundCacheByPlayer =
+        groundCacheByPlayer + (playerId -> updatedGroundCache)
     )
     (next, snap)
   }

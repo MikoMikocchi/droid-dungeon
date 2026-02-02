@@ -20,7 +20,12 @@ object GameWorldActor {
   def apply(loop: ServerGameLoop): Behavior[Command] =
     Behaviors.withTimers { timers =>
       timers.startTimerAtFixedRate(Tick, 50.millis)
-      active(loop, SessionRegistry.empty, TickProcessor.empty, SnapshotService.empty)
+      active(
+        loop,
+        SessionRegistry.empty,
+        TickProcessor.empty,
+        SnapshotService.empty
+      )
     }
 
   private def active(

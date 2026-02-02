@@ -16,12 +16,21 @@ final case class TickProcessor(
     processedTicks: Map[String, Long],
     tick: Long
 ) {
-  def registerPlayer(loop: ServerGameLoop, playerId: String): (TickProcessor, Long) = {
+  def registerPlayer(
+      loop: ServerGameLoop,
+      playerId: String
+  ): (TickProcessor, Long) = {
     val restoredTick = loop.registerPlayer(playerId)
-    (copy(processedTicks = processedTicks + (playerId -> restoredTick)), restoredTick)
+    (
+      copy(processedTicks = processedTicks + (playerId -> restoredTick)),
+      restoredTick
+    )
   }
 
-  def unregisterPlayer(loop: ServerGameLoop, playerId: String): TickProcessor = {
+  def unregisterPlayer(
+      loop: ServerGameLoop,
+      playerId: String
+  ): TickProcessor = {
     loop.savePlayerState(playerId, processedTicks.getOrElse(playerId, -1L))
     loop.unregisterPlayer(playerId)
     copy(
@@ -69,7 +78,8 @@ final case class TickProcessor(
         )
       }
 
-    val result = TickResult(nextTick, newProcessed, weaponStatesThisTick, enemiesAll)
+    val result =
+      TickResult(nextTick, newProcessed, weaponStatesThisTick, enemiesAll)
     (
       copy(
         pendingInputs = Map.empty,
