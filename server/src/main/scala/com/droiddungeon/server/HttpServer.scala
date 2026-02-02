@@ -8,20 +8,19 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.server.directives.Credentials
 import org.apache.pekko.stream.scaladsl.Flow
-import org.apache.pekko.http.scaladsl.model.ws.{Message, TextMessage}
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import org.apache.pekko.stream.scaladsl.{Sink, Source, Keep}
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import org.apache.pekko.util.Timeout
 import org.apache.pekko.stream.typed.scaladsl.ActorSource
+import org.apache.pekko.serialization.SerializationExtension
+import org.apache.pekko.util.ByteString
 
 import com.droiddungeon.config.GameConfig
 import com.droiddungeon.input.{InputFrame, MovementIntent, WeaponInput}
 import com.droiddungeon.items.ItemRegistry
 import com.droiddungeon.server.ServerGameLoop
-import com.droiddungeon.server.JsonProtocol.given
-import spray.json._
-
 import java.nio.file.{Files, Paths}
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
@@ -33,19 +32,28 @@ object HttpServer:
   private def websocketFlow(world: org.apache.pekko.actor.typed.ActorRef[GameWorldActor.Command])(using system: ActorSystem[Nothing]): Flow[Message, Message, Any] =
     import system.executionContext
     val playerId = java.util.UUID.randomUUID().toString
+    val serialization = SerializationExtension(system)
 
     val sink: Sink[Message, Any] = Flow[Message]
-      .collect { case tm: TextMessage => tm }
-      .mapAsync(1)(_.toStrict(2.seconds).map(_.text).recover { case ex =>
-        system.log.warn("Failed to read streamed text message, ignoring: {}", ex.getMessage)
-        ""
+      .collect { case bm: BinaryMessage => bm }
+      .mapAsync(1)(_.toStrict(2.seconds).map(_.data).recover { case ex =>
+        system.log.warn("Failed to read streamed binary message, ignoring: {}", ex.getMessage)
+        ByteString.empty
       })
-      .map(txt => Try(txt.parseJson.convertTo[ClientInput]))
+      .filter(_.nonEmpty)
+      .map(bytes =>
+        serialization
+          .deserialize(bytes.toArray, classOf[ClientInput])
+          .flatMap {
+            case input: ClientInput => Success(input)
+            case other => Failure(new IllegalArgumentException(s"Unexpected payload type: ${other.getClass.getName}"))
+          }
+      )
       .mapConcat {
         case Success(input) =>
           List(input.copy(playerId = playerId))
         case Failure(ex) =>
-          system.log.warn("Invalid client input JSON, ignoring: {}", ex.getMessage)
+          system.log.warn("Invalid client input binary payload, ignoring: {}", ex.getMessage)
           Nil
       }
       .to(Sink.foreach(input => world ! GameWorldActor.ApplyInput(input)))
@@ -56,9 +64,22 @@ object HttpServer:
         failureMatcher = PartialFunction.empty,
         bufferSize = 64,
         overflowStrategy = OverflowStrategy.dropHead
-      ).map(snap => TextMessage(snap.toJson.compactPrint))
+      ).map { snap =>
+        serialization.serialize(snap) match
+          case Success(bytes) => BinaryMessage(ByteString(bytes))
+          case Failure(ex) =>
+            system.log.warn("Failed to serialize WorldSnapshot, dropping: {}", ex.getMessage)
+            BinaryMessage(ByteString.empty)
+      }.mapConcat {
+        case bm @ BinaryMessage.Strict(data) if data.nonEmpty => bm :: Nil
+        case _ => Nil
+      }
 
-    val welcome = TextMessage(Welcome(playerId).toJson.compactPrint)
+    val welcome = serialization.serialize(Welcome(playerId)) match
+      case Success(bytes) => BinaryMessage(ByteString(bytes))
+      case Failure(ex) =>
+        system.log.warn("Failed to serialize Welcome, dropping: {}", ex.getMessage)
+        BinaryMessage(ByteString.empty)
     val source: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]] =
       Source.single(welcome).concatMat(snapshotSource)(Keep.right)
 
@@ -66,7 +87,7 @@ object HttpServer:
       world ! GameWorldActor.RegisterSession(playerId, ref)
       ref
     }.watchTermination() { (ref: org.apache.pekko.actor.typed.ActorRef[WorldSnapshot], done) =>
-      done.onComplete(_ => world ! GameWorldActor.UnregisterSession(ref))(system.executionContext)
+      done.onComplete(_ => world ! GameWorldActor.UnregisterSession(ref))(using system.executionContext)
       ref
     }
 
@@ -110,7 +131,7 @@ object HttpServer:
         },
         tickRoute.getOrElse(reject),
         path("ws") {
-          handleWebSocketMessages(websocketFlow(worldActor))
+          handleWebSocketMessages(websocketFlow(worldActor)(using system))
         }
       )
 

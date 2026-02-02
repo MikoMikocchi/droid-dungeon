@@ -18,6 +18,7 @@ dependencies {
     implementation("org.apache.pekko:pekko-stream_3:$pekkoVersion")
     implementation("org.apache.pekko:pekko-stream-typed_3:$pekkoVersion")
     implementation("org.apache.pekko:pekko-http_3:$pekkoVersion")
+    implementation("org.apache.pekko:pekko-serialization-jackson_3:$pekkoVersion")
     implementation("org.apache.pekko:pekko-http-spray-json_3:$pekkoVersion")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("com.typesafe:config:1.4.3")
