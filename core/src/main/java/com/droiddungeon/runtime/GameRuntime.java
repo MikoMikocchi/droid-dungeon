@@ -3,6 +3,7 @@ package com.droiddungeon.runtime;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.utils.TimeUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.config.GameConfig;
@@ -10,6 +11,7 @@ import com.droiddungeon.control.GameRenderCoordinator;
 import com.droiddungeon.control.GameUpdater;
 import com.droiddungeon.control.MapController;
 import com.droiddungeon.debug.DebugTextBuilder;
+import com.droiddungeon.entity.EntityIds;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.DungeonGenerator;
@@ -34,11 +36,19 @@ import com.droiddungeon.net.dto.GroundItemSnapshotDto;
 import com.droiddungeon.net.dto.WeaponStateSnapshotDto;
 import com.droiddungeon.net.dto.WorldSnapshotDto;
 import com.droiddungeon.render.ClientAssets;
+import com.droiddungeon.save.SaveGame;
 import com.droiddungeon.systems.CameraController;
 import com.droiddungeon.systems.EnemySystem;
 import com.droiddungeon.systems.InventorySystem;
 import com.droiddungeon.systems.WeaponSystem;
 import com.droiddungeon.ui.MapOverlay;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
+import java.util.UUID;
 
 /** Thin orchestration shell: wires input → update → render. */
 public final class GameRuntime {
@@ -50,6 +60,7 @@ public final class GameRuntime {
   private final boolean networkMode;
   private final NetworkClientAdapter networkClient;
   private final NetworkSnapshotBuffer snapshotBuffer;
+  private SaveGame pendingSave;
 
   private Viewport worldViewport;
   private Viewport uiViewport;
@@ -66,12 +77,12 @@ public final class GameRuntime {
   private boolean worldSeedForced;
   private int spawnX;
   private int spawnY;
-  private String playerId = java.util.UUID.randomUUID().toString();
+  private String playerId = UUID.randomUUID().toString();
   private MapOverlay mapOverlay;
 
   // Network prediction state
   private long clientTickCounter = 0L;
-  private final java.util.Deque<SentInput> pendingInputs = new java.util.ArrayDeque<>();
+  private final Deque<SentInput> pendingInputs = new ArrayDeque<>();
 
   private static final record SentInput(
       long tick,
@@ -117,6 +128,14 @@ public final class GameRuntime {
     this.snapshotBuffer = buffer != null ? buffer : new NetworkSnapshotBuffer();
   }
 
+  public void setPendingSave(SaveGame save) {
+    this.pendingSave = save;
+    if (save != null) {
+      this.worldSeed = save.seed;
+      this.worldSeedForced = true;
+    }
+  }
+
   /** Set the seed in advance (for example, from the server) before calling {@link #create()}. */
   public void setWorldSeed(long worldSeed) {
     this.worldSeed = worldSeed;
@@ -138,10 +157,10 @@ public final class GameRuntime {
           worldSeed = Long.parseLong(seedProp);
           worldSeedForced = true;
         } catch (NumberFormatException ignored) {
-          worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+          worldSeed = TimeUtils.millis();
         }
       } else {
-        worldSeed = com.badlogic.gdx.utils.TimeUtils.millis();
+        worldSeed = TimeUtils.millis();
       }
     }
     DungeonGenerator.DungeonLayout layout =
@@ -167,7 +186,7 @@ public final class GameRuntime {
       String itemsPath = Gdx.files.internal("items.txt").file().getAbsolutePath();
       itemRegistry = ItemRegistry.loadWithLoader(itemsPath, textureLoader);
     } else {
-      itemRegistry = ItemRegistry.loadDataOnly(java.nio.file.Path.of("items.txt"));
+      itemRegistry = ItemRegistry.loadDataOnly(Path.of("items.txt"));
     }
     GroundItemStore gs = new GroundItemStore(entityWorld, itemRegistry);
     this.groundStore = gs;
@@ -183,6 +202,10 @@ public final class GameRuntime {
     mapOverlay.revealAround(context.player(), 10);
     seedDemoItems();
     runStateManager = new RunStateManager();
+
+    if (pendingSave != null) {
+      applySave(pendingSave);
+    }
   }
 
   public void resize(int width, int height) {
@@ -507,11 +530,7 @@ public final class GameRuntime {
       context.player().update(0f, config.playerSpeedTilesPerSecond());
 
       float serverDt = Float.parseFloat(System.getProperty("network.serverTickDt", "0.05"));
-      var it = pendingInputs.iterator();
-      java.util.List<SentInput> toReplay = new java.util.ArrayList<>();
-      while (it.hasNext()) {
-        toReplay.add(it.next());
-      }
+      List<SentInput> toReplay = new ArrayList<>(pendingInputs);
       for (SentInput s : toReplay) {
         movementController.update(
             context.grid(), context.player(), context.entityWorld(), s.movement());
@@ -571,5 +590,127 @@ public final class GameRuntime {
             context.player().getGridX() + 1,
             context.player().getGridY(),
             new ItemStack("test_chip", 5));
+  }
+
+  /** Capture a save snapshot of the current world. */
+  public SaveGame snapshotSave(String worldName) {
+    if (context == null) return null;
+
+    var grid = context.grid();
+    int minX = grid.getMinGeneratedX();
+    int maxX = grid.getMaxGeneratedX();
+    int minY = grid.getMinGeneratedY();
+    int maxY = grid.getMaxGeneratedY();
+
+    List<SaveGame.BlockCellState> blockCells = new ArrayList<>();
+    for (int x = minX; x <= maxX; x++) {
+      for (int y = minY; y <= maxY; y++) {
+        var material = grid.getBlockMaterial(x, y);
+        float hp = grid.getBlockHealth(x, y);
+        String matName = material != null ? material.name() : null;
+        blockCells.add(new SaveGame.BlockCellState(x, y, matName, hp));
+      }
+    }
+
+    var groundSnapshots = new ArrayList<SaveGame.GroundItemState>();
+    for (var gi : groundStore.getGroundItems()) {
+      List<SaveGame.ItemStackState> bundled = new ArrayList<>();
+      for (var b : gi.getBundledItems()) {
+        var bs = SaveGame.ItemStackState.from(b);
+        if (bs != null) bundled.add(bs);
+      }
+      groundSnapshots.add(
+          new SaveGame.GroundItemState(
+              gi.id(),
+              gi.getGridX(),
+              gi.getGridY(),
+              SaveGame.ItemStackState.from(gi.getStack()),
+              bundled));
+    }
+
+    var invStates = new SaveGame.ItemStackState[inventory.size()];
+    for (int i = 0; i < inventory.size(); i++) {
+      invStates[i] = SaveGame.ItemStackState.from(inventory.get(i));
+    }
+
+    var ps =
+        new SaveGame.PlayerState(
+            context.player().getRenderX(),
+            context.player().getRenderY(),
+            context.player().getGridX(),
+            context.player().getGridY(),
+            context.playerStats().getHealth());
+
+    return new SaveGame(
+        worldName,
+        worldSeed,
+        Instant.now().toEpochMilli(),
+        minX,
+        maxX,
+        minY,
+        maxY,
+        ps,
+        invStates,
+        blockCells,
+        groundSnapshots,
+        EntityIds.peek());
+  }
+
+  /** Apply a previously saved snapshot to the current runtime (after create). */
+  private void applySave(SaveGame save) {
+    if (save == null || context == null) return;
+    if (save.seed != 0) {
+      this.worldSeed = save.seed;
+    }
+    EntityIds.setNext(save.nextEntityId);
+
+    var grid = context.grid();
+    for (var cell : save.blocks) {
+      BlockMaterial mat =
+          cell.blockMaterial != null ? BlockMaterial.valueOf(cell.blockMaterial) : null;
+      grid.setBlock(cell.x, cell.y, mat);
+      if (mat != null) {
+        float maxHp = mat.maxHealth();
+        float damage = Math.max(0f, maxHp - cell.blockHp);
+        if (damage > 0.0001f) {
+          grid.damageBlock(cell.x, cell.y, damage);
+        }
+      }
+    }
+
+    groundStore.clear();
+    for (var g : save.groundItems) {
+      var stack = g.stack != null ? g.stack.toItemStack() : null;
+      List<ItemStack> bundled = new ArrayList<>();
+      if (g.bundled != null) {
+        for (var b : g.bundled) {
+          var bs = b.toItemStack();
+          if (bs != null) bundled.add(bs);
+        }
+      }
+      if (stack != null && bundled.isEmpty()) {
+        groundStore.upsertGroundItem(g.id, g.x, g.y, stack);
+      } else if (stack != null) {
+        groundStore.addGroundBundle(g.x, g.y, stack, bundled);
+      }
+    }
+
+    if (save.player != null) {
+      context
+          .player()
+          .setServerPosition(
+              save.player.renderX, save.player.renderY, save.player.gridX, save.player.gridY);
+      context.playerStats().setHealth(save.player.health);
+    }
+
+    if (save.inventory != null) {
+      for (int i = 0; i < inventory.size(); i++) {
+        inventory.set(i, null);
+      }
+      for (int i = 0; i < Math.min(inventory.size(), save.inventory.length); i++) {
+        var s = save.inventory[i];
+        inventory.set(i, s != null ? s.toItemStack() : null);
+      }
+    }
   }
 }

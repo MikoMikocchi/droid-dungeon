@@ -11,4 +11,21 @@ public final class EntityIds {
   public static int next() {
     return COUNTER.getAndIncrement();
   }
+
+  /** Returns the next id that will be assigned (monotonic). */
+  public static int peek() {
+    return COUNTER.get();
+  }
+
+  /** Force the next id to be at least {@code next}. Useful when restoring saves. */
+  public static void setNext(int next) {
+    if (next <= 0) return;
+    int current;
+    do {
+      current = COUNTER.get();
+      if (next <= current) {
+        return;
+      }
+    } while (!COUNTER.compareAndSet(current, next));
+  }
 }
