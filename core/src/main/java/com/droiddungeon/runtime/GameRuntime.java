@@ -639,6 +639,12 @@ public final class GameRuntime {
             context.player().getGridX(),
             context.player().getGridY(),
             context.playerStats().getHealth());
+    var cs =
+        new SaveGame.CompanionState(
+            context.companionSystem().getRenderX(),
+            context.companionSystem().getRenderY(),
+            context.companionSystem().getGridX(),
+            context.companionSystem().getGridY());
 
     return new SaveGame(
         worldName,
@@ -649,6 +655,7 @@ public final class GameRuntime {
         minY,
         maxY,
         ps,
+        cs,
         invStates,
         blockCells,
         groundSnapshots,
@@ -700,6 +707,34 @@ public final class GameRuntime {
           .setServerPosition(
               save.player.renderX, save.player.renderY, save.player.gridX, save.player.gridY);
       context.playerStats().setHealth(save.player.health);
+    }
+
+    int playerGridX = save.player != null ? save.player.gridX : context.player().getGridX();
+    int playerGridY = save.player != null ? save.player.gridY : context.player().getGridY();
+    float playerRenderX = save.player != null ? save.player.renderX : context.player().getRenderX();
+    float playerRenderY = save.player != null ? save.player.renderY : context.player().getRenderY();
+
+    if (save.companion != null) {
+      context
+          .companionSystem()
+          .resetState(
+              save.companion.gridX,
+              save.companion.gridY,
+              save.companion.renderX,
+              save.companion.renderY,
+              playerGridX,
+              playerGridY);
+    } else if (save.player != null) {
+      // Backwards compatibility for old saves: spawn Dotty next to the saved player.
+      context
+          .companionSystem()
+          .resetState(
+              save.player.gridX,
+              save.player.gridY,
+              playerRenderX,
+              playerRenderY,
+              playerGridX,
+              playerGridY);
     }
 
     if (save.inventory != null) {

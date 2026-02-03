@@ -102,6 +102,39 @@ public final class CompanionSystem implements RenderableEntity, DamageableEntity
     renderY += (dy / dist) * step;
   }
 
+  /**
+   * Teleport/realign companion to a specific spot (used when loading saves or resuming sessions).
+   *
+   * <p>Also resets the follower trail to the current player tile so Dotty won't try to "catch up"
+   * from stale positions.
+   */
+  public void resetState(
+      int newGridX,
+      int newGridY,
+      float newRenderX,
+      float newRenderY,
+      int playerGridX,
+      int playerGridY) {
+    int fromX = this.gridX;
+    int fromY = this.gridY;
+
+    this.gridX = newGridX;
+    this.gridY = newGridY;
+    this.renderX = newRenderX;
+    this.renderY = newRenderY;
+    this.lastPlayerGridX = playerGridX;
+    this.lastPlayerGridY = playerGridY;
+
+    trail.clear();
+    for (int i = 0; i < delayTiles; i++) {
+      trail.addLast(new int[] {playerGridX, playerGridY});
+    }
+
+    if (entityWorld != null && (fromX != newGridX || fromY != newGridY)) {
+      entityWorld.move(this, fromX, fromY, newGridX, newGridY);
+    }
+  }
+
   public int getGridX() {
     return gridX;
   }

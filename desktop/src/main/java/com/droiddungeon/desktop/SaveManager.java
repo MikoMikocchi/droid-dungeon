@@ -120,6 +120,7 @@ public final class SaveManager {
             0,
             0,
             null,
+            null,
             new SaveGame.ItemStackState[0],
             List.of(),
             List.of(),

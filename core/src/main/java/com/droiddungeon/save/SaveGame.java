@@ -13,6 +13,7 @@ public final class SaveGame {
   public int minY;
   public int maxY;
   public PlayerState player;
+  public CompanionState companion;
   public ItemStackState[] inventory;
   public List<BlockCellState> blocks;
   public List<GroundItemState> groundItems;
@@ -29,6 +30,7 @@ public final class SaveGame {
       int minY,
       int maxY,
       PlayerState player,
+      CompanionState companion,
       ItemStackState[] inventory,
       List<BlockCellState> blocks,
       List<GroundItemState> groundItems,
@@ -41,6 +43,7 @@ public final class SaveGame {
     this.minY = minY;
     this.maxY = maxY;
     this.player = player;
+    this.companion = companion;
     this.inventory = inventory;
     this.blocks = blocks;
     this.groundItems = groundItems;
@@ -63,6 +66,23 @@ public final class SaveGame {
       this.gridX = gridX;
       this.gridY = gridY;
       this.health = health;
+    }
+  }
+
+  /** Companion snapshot within the save. */
+  public static final class CompanionState {
+    public float renderX;
+    public float renderY;
+    public int gridX;
+    public int gridY;
+
+    public CompanionState() {}
+
+    public CompanionState(float renderX, float renderY, int gridX, int gridY) {
+      this.renderX = renderX;
+      this.renderY = renderY;
+      this.gridX = gridX;
+      this.gridY = gridY;
     }
   }
 
