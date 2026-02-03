@@ -3,6 +3,7 @@ plugins {
 }
 
 val gdxVersion: String by project
+val lwjglVersionOverride = "3.3.6"
 
 dependencies {
     implementation(project(":core"))
@@ -19,6 +20,9 @@ dependencies {
 
 application {
     mainClass.set("com.droiddungeon.desktop.DesktopLauncher")
+    applicationDefaultJvmArgs += listOf(
+        "--enable-native-access=ALL-UNNAMED"
+    )
 }
 
 // Propagate project properties to JVM system properties for run task (network flags etc.)
@@ -29,6 +33,8 @@ tasks.named<JavaExec>("run") {
             systemProperty(key, value)
         }
     }
+    // Required by JDK 24+ to allow native library loads without warnings
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
 sourceSets {
@@ -41,4 +47,13 @@ tasks.withType<JavaExec>().configureEach {
     // Требуется на macOS для LWJGL3.
     jvmArgs("-XstartOnFirstThread")
     workingDir = file("../assets")
+}
+
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.lwjgl") {
+            useVersion(lwjglVersionOverride)
+            because("JDK 25 compatibility and updated JNI version support in LWJGL 3.3.6")
+        }
+    }
 }
