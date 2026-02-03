@@ -4,7 +4,7 @@ A cozy sci‑fi dungeon crawler about **us** and our loyal companion **Dotty**. 
 
 ## About
 
-**Droid Dungeon** is a small, cute adventure built on **Java 21** + **LibGDX**. You explore a procedurally generated underground world, keep your gear ready, and let Dotty trail behind as your trusty buddy.
+**Droid Dungeon** is a small, cute adventure built on **Java 25** + **LibGDX**. You explore a procedurally generated underground world, keep your gear ready, and let Dotty trail behind as your trusty buddy.
 
 ## Features
 
