@@ -1,13 +1,12 @@
 package com.droiddungeon.net.mapper;
 
-import java.util.Objects;
-
 import com.droiddungeon.input.InputFrame;
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.net.dto.ClientInputDto;
 import com.droiddungeon.net.dto.MovementIntentDto;
 import com.droiddungeon.net.dto.WeaponInputDto;
+import java.util.Objects;
 
 public final class InputDtoMapper {
   private InputDtoMapper() {}
@@ -28,10 +27,7 @@ public final class InputDtoMapper {
   public static WeaponInputDto toDto(WeaponInput weapon) {
     Objects.requireNonNull(weapon, "weapon");
     return new WeaponInputDto(
-        weapon.attackJustPressed(),
-        weapon.attackHeld(),
-        weapon.aimWorldX(),
-        weapon.aimWorldY());
+        weapon.attackJustPressed(), weapon.attackHeld(), weapon.aimWorldX(), weapon.aimWorldY());
   }
 
   public static ClientInputDto toDto(
@@ -42,8 +38,7 @@ public final class InputDtoMapper {
       boolean drop,
       boolean pickUp,
       boolean mine) {
-    return new ClientInputDto(
-        tick, playerId, toDto(movement), toDto(weapon), drop, pickUp, mine);
+    return new ClientInputDto(tick, playerId, toDto(movement), toDto(weapon), drop, pickUp, mine);
   }
 
   public static InputFrame toInputFrame(ClientInputDto dto) {

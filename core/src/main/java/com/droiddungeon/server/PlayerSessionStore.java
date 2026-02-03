@@ -1,12 +1,11 @@
 package com.droiddungeon.server;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
 import com.droiddungeon.runtime.GameContextFactory;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class PlayerSessionStore {
   private final GameContextFactory contextFactory;

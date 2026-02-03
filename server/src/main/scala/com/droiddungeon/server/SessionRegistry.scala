@@ -14,7 +14,7 @@ final case class SessionRegistry(
 
   def unregister(
       ref: ActorRef[WorldSnapshotDto]
-    ): (SessionRegistry, Set[String]) = {
+  ): (SessionRegistry, Set[String]) = {
     val removedPlayers = sessions.collect {
       case (pid, r) if r == ref => pid
     }.toSet

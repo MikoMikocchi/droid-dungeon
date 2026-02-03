@@ -1,7 +1,11 @@
 package com.droiddungeon.server
 
 import com.droiddungeon.input.InputFrame
-import com.droiddungeon.net.dto.{ClientInputDto, EnemySnapshotDto, WeaponStateSnapshotDto}
+import com.droiddungeon.net.dto.{
+  ClientInputDto,
+  EnemySnapshotDto,
+  WeaponStateSnapshotDto
+}
 import com.droiddungeon.net.mapper.InputDtoMapper
 
 import scala.jdk.CollectionConverters.*
@@ -9,12 +13,12 @@ import scala.jdk.CollectionConverters.*
 final case class TickResult(
     tick: Long,
     processedTicks: Map[String, Long],
-  weaponStates: Map[String, WeaponStateSnapshotDto],
-  enemies: Seq[EnemySnapshotDto]
+    weaponStates: Map[String, WeaponStateSnapshotDto],
+    enemies: Seq[EnemySnapshotDto]
 )
 
 final case class TickProcessor(
-  pendingInputs: Map[String, ClientInputDto],
+    pendingInputs: Map[String, ClientInputDto],
     processedTicks: Map[String, Long],
     tick: Long
 ) {

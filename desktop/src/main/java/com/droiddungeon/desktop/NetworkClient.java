@@ -1,14 +1,5 @@
 package com.droiddungeon.desktop;
 
-import java.io.IOException;
-import java.net.URI;
-import java.nio.ByteBuffer;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.handshake.ServerHandshake;
-
 import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.net.NetworkClientAdapter;
@@ -20,6 +11,13 @@ import com.droiddungeon.net.dto.WorldSnapshotDto;
 import com.droiddungeon.net.mapper.InputDtoMapper;
 import com.droiddungeon.runtime.NetworkSnapshot;
 import com.droiddungeon.runtime.NetworkSnapshotBuffer;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 
 public final class NetworkClient extends WebSocketClient implements NetworkClientAdapter {
   private final ProtocolCodec codec = CborProtocolCodec.createDefault();
@@ -129,8 +127,7 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
     if (!connected) return;
     String pid = playerId != null ? playerId : this.playerId;
     if (pid == null) return;
-    ClientInputDto dto =
-        InputDtoMapper.toDto(tick, pid, movement, weapon, drop, pickUp, mine);
+    ClientInputDto dto = InputDtoMapper.toDto(tick, pid, movement, weapon, drop, pickUp, mine);
     tickCounter = Math.max(tickCounter, tick + 1);
     try {
       send(codec.encodeInput(dto));

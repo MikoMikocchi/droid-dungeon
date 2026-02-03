@@ -1,6 +1,11 @@
 package com.droiddungeon.server
 
-import com.droiddungeon.net.dto.{EnemySnapshotDto, GroundItemSnapshotDto, WeaponStateSnapshotDto, WorldSnapshotDto}
+import com.droiddungeon.net.dto.{
+  EnemySnapshotDto,
+  GroundItemSnapshotDto,
+  WeaponStateSnapshotDto,
+  WorldSnapshotDto
+}
 import com.droiddungeon.server.WorldSnapshotBuilder.BlockState
 import org.apache.pekko.actor.typed.ActorRef
 

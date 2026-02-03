@@ -24,8 +24,7 @@ public final class CborProtocolCodec implements ProtocolCodec {
   public DecodedMessage decode(ByteBuffer buffer) throws IOException {
     BinaryProtocol.Header header = BinaryProtocol.readHeader(buffer);
     if (header.version() != BinaryProtocol.VERSION_1) {
-      throw new IllegalArgumentException(
-          "Unsupported protocol version: " + header.version());
+      throw new IllegalArgumentException("Unsupported protocol version: " + header.version());
     }
     byte[] payload = new byte[buffer.remaining()];
     buffer.get(payload);
@@ -36,8 +35,7 @@ public final class CborProtocolCodec implements ProtocolCodec {
           new SnapshotMessage(mapper.readValue(payload, WorldSnapshotDto.class));
       case BinaryProtocol.TYPE_INPUT ->
           new InputMessage(mapper.readValue(payload, ClientInputDto.class));
-      default -> throw new IllegalArgumentException(
-          "Unexpected message type: " + header.type());
+      default -> throw new IllegalArgumentException("Unexpected message type: " + header.type());
     };
   }
 
