@@ -1,19 +1,20 @@
 package com.droiddungeon.server
 
+import com.droiddungeon.net.dto.WorldSnapshotDto
 import org.apache.pekko.actor.typed.ActorRef
 
 final case class SessionRegistry(
-    sessions: Map[String, ActorRef[WorldSnapshot]]
+    sessions: Map[String, ActorRef[WorldSnapshotDto]]
 ) {
   def register(
       playerId: String,
-      ref: ActorRef[WorldSnapshot]
+      ref: ActorRef[WorldSnapshotDto]
   ): SessionRegistry =
     copy(sessions = sessions + (playerId -> ref))
 
   def unregister(
-      ref: ActorRef[WorldSnapshot]
-  ): (SessionRegistry, Set[String]) = {
+      ref: ActorRef[WorldSnapshotDto]
+    ): (SessionRegistry, Set[String]) = {
     val removedPlayers = sessions.collect {
       case (pid, r) if r == ref => pid
     }.toSet

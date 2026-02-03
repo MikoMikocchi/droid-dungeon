@@ -1,29 +1,28 @@
 package com.droiddungeon.desktop;
 
-import com.droiddungeon.input.MovementIntent;
-import com.droiddungeon.input.WeaponInput;
-import com.droiddungeon.net.BinaryProtocol;
-import com.droiddungeon.net.NetworkClientAdapter;
-import com.droiddungeon.net.dto.ClientInputDto;
-import com.droiddungeon.net.dto.MovementIntentDto;
-import com.droiddungeon.net.dto.WeaponInputDto;
-import com.droiddungeon.net.dto.WelcomeDto;
-import com.droiddungeon.net.dto.WorldSnapshotDto;
-import com.droiddungeon.runtime.NetworkSnapshot;
-import com.droiddungeon.runtime.NetworkSnapshotBuffer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
+import com.droiddungeon.input.MovementIntent;
+import com.droiddungeon.input.WeaponInput;
+import com.droiddungeon.net.NetworkClientAdapter;
+import com.droiddungeon.net.codec.CborProtocolCodec;
+import com.droiddungeon.net.codec.ProtocolCodec;
+import com.droiddungeon.net.dto.ClientInputDto;
+import com.droiddungeon.net.dto.WelcomeDto;
+import com.droiddungeon.net.dto.WorldSnapshotDto;
+import com.droiddungeon.net.mapper.InputDtoMapper;
+import com.droiddungeon.runtime.NetworkSnapshot;
+import com.droiddungeon.runtime.NetworkSnapshotBuffer;
+
 public final class NetworkClient extends WebSocketClient implements NetworkClientAdapter {
-  private final ObjectMapper cbor = new ObjectMapper(new CBORFactory()).findAndRegisterModules();
+  private final ProtocolCodec codec = CborProtocolCodec.createDefault();
   private final NetworkSnapshotBuffer buffer;
   private final AtomicReference<WorldSnapshotDto> latestSnapshot = new AtomicReference<>();
   private volatile boolean connected = false;
@@ -44,23 +43,15 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
   @Override
   public void onMessage(ByteBuffer bytes) {
     try {
-      bytes.order(ByteOrder.BIG_ENDIAN);
-      BinaryProtocol.Header header = BinaryProtocol.readHeader(bytes);
-      if (header.version() != BinaryProtocol.VERSION_1) return;
-
-      byte[] payload = new byte[bytes.remaining()];
-      bytes.get(payload);
-
-      if (header.type() == BinaryProtocol.TYPE_WELCOME) {
-        WelcomeDto welcome = cbor.readValue(payload, WelcomeDto.class);
+      ProtocolCodec.DecodedMessage decoded = codec.decode(bytes);
+      if (decoded instanceof ProtocolCodec.WelcomeMessage(WelcomeDto welcome)) {
         if (welcome != null && welcome.playerId() != null && !welcome.playerId().isEmpty()) {
           playerId = welcome.playerId();
           PlayerIdStore.save(playerId);
         }
         return;
       }
-      if (header.type() == BinaryProtocol.TYPE_SNAPSHOT) {
-        WorldSnapshotDto snap = cbor.readValue(payload, WorldSnapshotDto.class);
+      if (decoded instanceof ProtocolCodec.SnapshotMessage(WorldSnapshotDto snap)) {
         if (snap != null) {
           latestSnapshot.set(snap);
           if (playerId != null && snap.players() != null) {
@@ -138,28 +129,11 @@ public final class NetworkClient extends WebSocketClient implements NetworkClien
     if (!connected) return;
     String pid = playerId != null ? playerId : this.playerId;
     if (pid == null) return;
-    MovementIntentDto m =
-        new MovementIntentDto(
-            movement.leftHeld(),
-            movement.rightHeld(),
-            movement.upHeld(),
-            movement.downHeld(),
-            movement.leftJustPressed(),
-            movement.rightJustPressed(),
-            movement.upJustPressed(),
-            movement.downJustPressed());
-    WeaponInputDto w =
-        new WeaponInputDto(
-            weapon.attackJustPressed(),
-            weapon.attackHeld(),
-            weapon.aimWorldX(),
-            weapon.aimWorldY());
-    ClientInputDto dto = new ClientInputDto(tick, pid, m, w, drop, pickUp, mine);
+    ClientInputDto dto =
+        InputDtoMapper.toDto(tick, pid, movement, weapon, drop, pickUp, mine);
     tickCounter = Math.max(tickCounter, tick + 1);
     try {
-      byte[] payload = cbor.writeValueAsBytes(dto);
-      byte[] framed = BinaryProtocol.wrap(BinaryProtocol.TYPE_INPUT, payload);
-      send(framed);
+      send(codec.encodeInput(dto));
     } catch (IOException ignored) {
     }
   }

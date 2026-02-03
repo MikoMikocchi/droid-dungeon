@@ -1,5 +1,10 @@
 package com.droiddungeon.server
 
+import com.droiddungeon.net.dto.{
+  ClientInputDto,
+  EnemySnapshotDto,
+  WorldSnapshotDto
+}
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ActorRef, Behavior}
 
@@ -10,11 +15,11 @@ object GameWorldActor {
   sealed trait Command
   final case class RegisterSession(
       playerId: String,
-      ref: ActorRef[WorldSnapshot]
+      ref: ActorRef[WorldSnapshotDto]
   ) extends Command
-  final case class UnregisterSession(ref: ActorRef[WorldSnapshot])
+  final case class UnregisterSession(ref: ActorRef[WorldSnapshotDto])
       extends Command
-  final case class ApplyInput(input: ClientInput) extends Command
+  final case class ApplyInput(input: ClientInputDto) extends Command
   final case class AdvanceGlobal(dt: Float) extends Command
   private case object Tick extends Command
   def apply(loop: ServerGameLoop): Behavior[Command] =
@@ -42,7 +47,7 @@ object GameWorldActor {
           val (updatedTicks, _) = ticks.registerPlayer(loop, playerId)
           val enemiesAll =
             loop.enemySystem().getEnemies().asScala.toSeq.map { e =>
-              EnemySnapshot(
+              new EnemySnapshotDto(
                 e.id(),
                 e.getType.toString,
                 e.getRenderX,
@@ -73,7 +78,7 @@ object GameWorldActor {
           active(loop, updatedSessions, nextTicks, nextSnapshots)
 
         case ApplyInput(input) =>
-          if (sessions.contains(input.playerId)) {
+          if (sessions.contains(input.playerId())) {
             val nextTicks = ticks.enqueueInput(input)
             active(loop, sessions, nextTicks, snapshots)
           } else {

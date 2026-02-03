@@ -1,13 +1,13 @@
 package com.droiddungeon.server
 
+import com.droiddungeon.net.codec.{CborProtocolCodec, ProtocolCodec}
+import com.droiddungeon.net.dto.{ClientInputDto, WelcomeDto, WorldSnapshotDto}
+import java.nio.ByteBuffer
 import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message}
 import org.apache.pekko.stream.OverflowStrategy
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.util.ByteString
-
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.cbor.CBORFactory
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
@@ -19,7 +19,7 @@ object WebSocketSessionHandler:
     import system.executionContext
     val playerId =
       requestedPlayerId.filter(id => id != null && id.nonEmpty).getOrElse(java.util.UUID.randomUUID().toString)
-    val cbor = new ObjectMapper(new CBORFactory()).findAndRegisterModules()
+    val codec: ProtocolCodec = CborProtocolCodec.createDefault()
 
     val sink: Sink[Message, Any] = Flow[Message]
       .collect { case bm: BinaryMessage => bm }
@@ -28,34 +28,47 @@ object WebSocketSessionHandler:
         ByteString.empty
       })
       .filter(_.nonEmpty)
-      .map(bytes => Try(ServerProtocolMapper.deserializeInput(cbor, bytes.toArray)))
+      .map(bytes => Try(codec.decode(ByteBuffer.wrap(bytes.toArray))))
       .mapConcat {
-        case Success(input) =>
-          List(input.copy(playerId = playerId))
+        case Success(msg: ProtocolCodec.InputMessage) =>
+          val input = msg.value()
+          List(
+            new ClientInputDto(
+              input.tick(),
+              playerId,
+              input.movement(),
+              input.weapon(),
+              input.drop(),
+              input.pickUp(),
+              input.mine()
+            )
+          )
+        case Success(_) =>
+          Nil
         case Failure(ex) =>
           system.log.warn("Invalid client input binary payload, ignoring: {}", ex.getMessage)
           Nil
       }
       .to(Sink.foreach(input => world ! GameWorldActor.ApplyInput(input)))
 
-    val snapshotSource: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]] =
-      org.apache.pekko.stream.typed.scaladsl.ActorSource.actorRef[WorldSnapshot](
+    val snapshotSource: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshotDto]] =
+      org.apache.pekko.stream.typed.scaladsl.ActorSource.actorRef[WorldSnapshotDto](
         completionMatcher = PartialFunction.empty,
         failureMatcher = PartialFunction.empty,
         bufferSize = 64,
         overflowStrategy = OverflowStrategy.dropHead
       ).map { snap =>
-        ServerProtocolMapper.encodeSnapshotMessage(cbor, snap)
+        BinaryMessage(ByteString(codec.encodeSnapshot(snap)))
       }
 
-    val welcome = ServerProtocolMapper.encodeWelcomeMessage(cbor, playerId)
-    val source: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]] =
+    val welcome = BinaryMessage(ByteString(codec.encodeWelcome(new WelcomeDto(playerId, null, null))))
+    val source: Source[Message, org.apache.pekko.actor.typed.ActorRef[WorldSnapshotDto]] =
       Source.single(welcome).concatMat(snapshotSource)(Keep.right)
 
-    Flow.fromSinkAndSourceCoupledMat(sink, source) { (_, ref: org.apache.pekko.actor.typed.ActorRef[WorldSnapshot]) =>
+    Flow.fromSinkAndSourceCoupledMat(sink, source) { (_, ref: org.apache.pekko.actor.typed.ActorRef[WorldSnapshotDto]) =>
       world ! GameWorldActor.RegisterSession(playerId, ref)
       ref
-    }.watchTermination() { (ref: org.apache.pekko.actor.typed.ActorRef[WorldSnapshot], done) =>
+    }.watchTermination() { (ref: org.apache.pekko.actor.typed.ActorRef[WorldSnapshotDto], done) =>
       done.onComplete(_ => world ! GameWorldActor.UnregisterSession(ref))(using system.executionContext)
       ref
     }

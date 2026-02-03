@@ -1,6 +1,8 @@
 package com.droiddungeon.server
 
 import com.droiddungeon.items.GroundItem
+import com.droiddungeon.net.dto.
+  {BlockChangeDto, ChunkSnapshotDto, EnemySnapshotDto, GroundItemSnapshotDto, MiningStateSnapshotDto, WeaponStateSnapshotDto, WorldSnapshotDto}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -14,17 +16,17 @@ object WorldSnapshotBuilder:
       tick: Long,
       full: Boolean,
       blockCache: Map[(Int, Int), BlockState],
-      prevGround: Map[Int, GroundItemSnapshot],
+      prevGround: Map[Int, GroundItemSnapshotDto],
       processedTicks: Map[String, Long],
-      weaponStatesThisTick: Map[String, WeaponStateSnapshot],
-      enemiesToSend: Seq[EnemySnapshot],
+      weaponStatesThisTick: Map[String, WeaponStateSnapshotDto],
+      enemiesToSend: Seq[EnemySnapshotDto],
       enemyRemovals: Seq[Int]
-  ): (WorldSnapshot, Map[(Int, Int), BlockState], Map[Int, GroundItemSnapshot]) = {
+  ): (WorldSnapshotDto, Map[(Int, Int), BlockState], Map[Int, GroundItemSnapshotDto]) = {
     val centerOpt = Option(
       loop.playerSnapshotFor(playerId, processedTicks.getOrElse(playerId, -1L))
     )
     val (centerX, centerY) =
-      centerOpt.map(p => (p.gridX, p.gridY)).getOrElse((0, 0))
+      centerOpt.map(p => (p.gridX(), p.gridY())).getOrElse((0, 0))
 
     val (blockChanges, updatedBlockCache) =
       collectBlockChanges(loop.grid(), centerX, centerY, blockCache, radius = 8)
@@ -42,42 +44,35 @@ object WorldSnapshotBuilder:
       else Seq.empty
     val miningStatesAll = playerIds.toSeq.flatMap { id =>
       Option(loop.getPlayerMiningTarget(id)).map(t =>
-        MiningStateSnapshot(id, t.x(), t.y(), t.progress())
+        new MiningStateSnapshotDto(id, t.x(), t.y(), t.progress())
       )
     }
 
-    val snap = WorldSnapshot(
-      tick = tick,
-      seed = loop.worldSeed(),
-      version = "0.1",
-      full = full,
-      chunks = chunks,
-      players = playerIds.toSeq.flatMap { id =>
-        val last = processedTicks.getOrElse(id, -1L)
-        Option(loop.playerSnapshotFor(id, last)).toSeq.map { p =>
-          PlayerSnapshot(
-            p.playerId,
-            p.x,
-            p.y,
-            p.gridX,
-            p.gridY,
-            p.hp,
-            p.lastProcessedTick
-          )
-        }
-      },
-      enemies = enemiesToSend,
-      enemyRemovals = enemyRemovals,
-      blockChanges = blockChanges,
-      groundItems = groundToSend,
-      groundItemRemovals = groundRemovals,
-      weaponStates = playerIds.toSeq.map { id =>
-        weaponStatesThisTick
-          .getOrElse(id, WeaponStateSnapshot(id, false, 0f, 0f))
-      },
-      miningStates = miningStatesAll
+    val players = playerIds.toSeq.flatMap { id =>
+      val last = processedTicks.getOrElse(id, -1L)
+      Option(loop.playerSnapshotFor(id, last)).toSeq
+    }
+    val weaponStates = playerIds.toSeq.map { id =>
+      weaponStatesThisTick
+        .getOrElse(id, new WeaponStateSnapshotDto(id, false, 0f, 0f))
+    }
+    val snap = new WorldSnapshotDto(
+      tick,
+      loop.worldSeed(),
+      "0.1",
+      full,
+      chunks.toArray,
+      null,
+      players.toArray,
+      enemiesToSend.toArray,
+      enemyRemovals.toArray,
+      blockChanges.toArray,
+      groundToSend.toArray,
+      groundRemovals.toArray,
+      weaponStates.toArray,
+      miningStatesAll.toArray
     )
-    val nextGroundMap = groundAll.map(g => g.id -> g).toMap
+    val nextGroundMap = groundAll.map(g => g.id() -> g).toMap
     (snap, updatedBlockCache, nextGroundMap)
   }
 
@@ -87,8 +82,8 @@ object WorldSnapshotBuilder:
       centerY: Int,
       previous: Map[(Int, Int), BlockState],
       radius: Int
-  ): (Seq[BlockChange], Map[(Int, Int), BlockState]) = {
-    val buffer = mutable.ArrayBuffer.empty[BlockChange]
+  ): (Seq[BlockChangeDto], Map[(Int, Int), BlockState]) = {
+    val buffer = mutable.ArrayBuffer.empty[BlockChangeDto]
     var updated = previous
 
     for {
@@ -106,7 +101,7 @@ object WorldSnapshotBuilder:
             ) < 0.0001 =>
         // unchanged
         case _ =>
-          buffer += BlockChange(x, y, materialId, hp)
+          buffer += new BlockChangeDto(x, y, materialId, hp)
       }
       updated = updated + (key -> BlockState(materialId, hp))
     }
@@ -118,7 +113,7 @@ object WorldSnapshotBuilder:
       centerX: Int,
       centerY: Int,
       radius: Int
-  ): Seq[GroundItemSnapshot] = {
+  ): Seq[GroundItemSnapshotDto] = {
     val r2 = radius * radius
     groundItems
       .filter { g =>
@@ -128,7 +123,7 @@ object WorldSnapshotBuilder:
       }
       .map { g =>
         val stack = g.getStack
-        GroundItemSnapshot(
+        new GroundItemSnapshotDto(
           g.id(),
           g.getGridX,
           g.getGridY,
@@ -140,23 +135,23 @@ object WorldSnapshotBuilder:
   }
 
   def diffEnemies(
-      current: Seq[EnemySnapshot],
-      previous: Map[Int, EnemySnapshot]
-  ): (Seq[EnemySnapshot], Seq[Int]) = {
-    val currentMap = current.map(e => e.id -> e).toMap
+        current: Seq[EnemySnapshotDto],
+        previous: Map[Int, EnemySnapshotDto]
+      ): (Seq[EnemySnapshotDto], Seq[Int]) = {
+    val currentMap = current.map(e => e.id() -> e).toMap
     val changed =
-      current.filter(e => previous.get(e.id).forall(prev => prev != e))
+      current.filter(e => previous.get(e.id()).forall(prev => prev != e))
     val removed = previous.keySet.diff(currentMap.keySet).toSeq
     (changed, removed)
   }
 
   def diffGround(
-      current: Seq[GroundItemSnapshot],
-      previous: Map[Int, GroundItemSnapshot]
-  ): (Seq[GroundItemSnapshot], Seq[Int]) = {
-    val currentMap = current.map(g => g.id -> g).toMap
+        current: Seq[GroundItemSnapshotDto],
+        previous: Map[Int, GroundItemSnapshotDto]
+      ): (Seq[GroundItemSnapshotDto], Seq[Int]) = {
+    val currentMap = current.map(g => g.id() -> g).toMap
     val changed =
-      current.filter(g => previous.get(g.id).forall(prev => prev != g))
+      current.filter(g => previous.get(g.id()).forall(prev => prev != g))
     val removed = previous.keySet.diff(currentMap.keySet).toSeq
     (changed, removed)
   }
@@ -166,16 +161,16 @@ object WorldSnapshotBuilder:
       centerX: Int,
       centerY: Int,
       chunkRadius: Int
-  ): Seq[ChunkSnapshot] = {
+  ): Seq[ChunkSnapshotDto] = {
     val chunkSize = grid.getChunkSize()
     val pcx = Math.floorDiv(centerX, chunkSize)
     val pcy = Math.floorDiv(centerY, chunkSize)
-    val chunks = mutable.ArrayBuffer.empty[ChunkSnapshot]
+    val chunks = mutable.ArrayBuffer.empty[ChunkSnapshotDto]
     for {
       cx <- (pcx - chunkRadius) to (pcx + chunkRadius)
       cy <- (pcy - chunkRadius) to (pcy + chunkRadius)
     } {
-      val blocks = mutable.ArrayBuffer.empty[BlockChange]
+      val blocks = mutable.ArrayBuffer.empty[BlockChangeDto]
       val originX = cx * chunkSize
       val originY = cy * chunkSize
       for {
@@ -187,9 +182,9 @@ object WorldSnapshotBuilder:
         val material = grid.getBlockMaterial(x, y)
         val materialId = Option(material).map(_.name()).getOrElse("")
         val hp = grid.getBlockHealth(x, y)
-        blocks += BlockChange(x, y, materialId, hp)
+        blocks += new BlockChangeDto(x, y, materialId, hp)
       }
-      chunks += ChunkSnapshot(cx, cy, blocks.toSeq)
+      chunks += new ChunkSnapshotDto(cx, cy, blocks.toArray)
     }
     chunks.toSeq
   }

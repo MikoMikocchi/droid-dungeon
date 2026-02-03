@@ -1,18 +1,20 @@
 package com.droiddungeon.server
 
-import com.droiddungeon.input.{InputFrame, MovementIntent, WeaponInput}
+import com.droiddungeon.input.InputFrame
+import com.droiddungeon.net.dto.{ClientInputDto, EnemySnapshotDto, WeaponStateSnapshotDto}
+import com.droiddungeon.net.mapper.InputDtoMapper
 
 import scala.jdk.CollectionConverters.*
 
 final case class TickResult(
     tick: Long,
     processedTicks: Map[String, Long],
-    weaponStates: Map[String, WeaponStateSnapshot],
-    enemies: Seq[EnemySnapshot]
+  weaponStates: Map[String, WeaponStateSnapshotDto],
+  enemies: Seq[EnemySnapshotDto]
 )
 
 final case class TickProcessor(
-    pendingInputs: Map[String, ClientInput],
+  pendingInputs: Map[String, ClientInputDto],
     processedTicks: Map[String, Long],
     tick: Long
 ) {
@@ -39,21 +41,21 @@ final case class TickProcessor(
     )
   }
 
-  def enqueueInput(input: ClientInput): TickProcessor =
-    copy(pendingInputs = pendingInputs + (input.playerId -> input))
+  def enqueueInput(input: ClientInputDto): TickProcessor =
+    copy(pendingInputs = pendingInputs + (input.playerId() -> input))
 
   def processTick(loop: ServerGameLoop): (TickProcessor, TickResult) = {
     var newProcessed = processedTicks
-    var weaponStatesThisTick = Map.empty[String, WeaponStateSnapshot]
+    var weaponStatesThisTick = Map.empty[String, WeaponStateSnapshotDto]
 
     pendingInputs.foreach { case (pid, in) =>
       val frame = toInputFrame(in)
       val res = loop.tickForPlayer(pid, frame, 0.05f)
-      newProcessed = newProcessed + (in.playerId -> in.tick)
+      newProcessed = newProcessed + (in.playerId() -> in.tick())
       if (res != null && res.weaponState() != null) {
         val w = res.weaponState()
         weaponStatesThisTick =
-          weaponStatesThisTick + (pid -> WeaponStateSnapshot(
+          weaponStatesThisTick + (pid -> new WeaponStateSnapshotDto(
             pid,
             w.swinging(),
             w.swingProgress(),
@@ -67,7 +69,7 @@ final case class TickProcessor(
     val nextTick = tick + 1
     val enemiesAll =
       loop.enemySystem().getEnemies().asScala.toSeq.map { e =>
-        EnemySnapshot(
+        new EnemySnapshotDto(
           e.id(),
           e.getType.toString,
           e.getRenderX,
@@ -90,27 +92,8 @@ final case class TickProcessor(
     )
   }
 
-  private def toInputFrame(in: ClientInput): InputFrame = {
-    val m = in.movement
-    val w = in.weapon
-    val movement = new MovementIntent(
-      m.leftHeld,
-      m.rightHeld,
-      m.upHeld,
-      m.downHeld,
-      m.leftJustPressed,
-      m.rightJustPressed,
-      m.upJustPressed,
-      m.downJustPressed
-    )
-    val weapon = new WeaponInput(
-      w.attackJustPressed,
-      w.attackHeld,
-      w.aimWorldX,
-      w.aimWorldY
-    )
-    InputFrame.serverFrame(movement, weapon, in.drop, in.pickUp, in.mine)
-  }
+  private def toInputFrame(in: ClientInputDto): InputFrame =
+    InputDtoMapper.toInputFrame(in)
 }
 
 object TickProcessor {

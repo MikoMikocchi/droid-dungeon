@@ -1,13 +1,13 @@
 package com.droiddungeon.server
 
-import org.apache.pekko.actor.typed.ActorRef
-
+import com.droiddungeon.net.dto.{EnemySnapshotDto, GroundItemSnapshotDto, WeaponStateSnapshotDto, WorldSnapshotDto}
 import com.droiddungeon.server.WorldSnapshotBuilder.BlockState
+import org.apache.pekko.actor.typed.ActorRef
 
 final case class SnapshotService(
     blockCacheByPlayer: Map[String, Map[(Int, Int), BlockState]],
-    groundCacheByPlayer: Map[String, Map[Int, GroundItemSnapshot]],
-    prevEnemies: Map[Int, EnemySnapshot]
+    groundCacheByPlayer: Map[String, Map[Int, GroundItemSnapshotDto]],
+    prevEnemies: Map[Int, EnemySnapshotDto]
 ) {
   def removePlayers(playerIds: Set[String]): SnapshotService =
     copy(
@@ -21,8 +21,8 @@ final case class SnapshotService(
       playerIds: Iterable[String],
       tick: Long,
       processedTicks: Map[String, Long],
-      enemiesAll: Seq[EnemySnapshot]
-  ): (SnapshotService, WorldSnapshot) = {
+      enemiesAll: Seq[EnemySnapshotDto]
+  ): (SnapshotService, WorldSnapshotDto) = {
     val (snap, updatedBlockCache, updatedGroundCache) =
       WorldSnapshotBuilder.snapshotForPlayer(
         loop,
@@ -47,12 +47,12 @@ final case class SnapshotService(
 
   def buildSnapshots(
       loop: ServerGameLoop,
-      sessions: Map[String, ActorRef[WorldSnapshot]],
+      sessions: Map[String, ActorRef[WorldSnapshotDto]],
       tick: Long,
       processedTicks: Map[String, Long],
-      weaponStatesThisTick: Map[String, WeaponStateSnapshot],
-      enemiesAll: Seq[EnemySnapshot]
-  ): (SnapshotService, Seq[(ActorRef[WorldSnapshot], WorldSnapshot)]) = {
+      weaponStatesThisTick: Map[String, WeaponStateSnapshotDto],
+      enemiesAll: Seq[EnemySnapshotDto]
+  ): (SnapshotService, Seq[(ActorRef[WorldSnapshotDto], WorldSnapshotDto)]) = {
     val forceFull = tick % SnapshotService.KeyframeEvery == 0
     val (enemiesToSend, enemyRemovals) =
       if (forceFull) (enemiesAll, Seq.empty[Int])
@@ -84,7 +84,7 @@ final case class SnapshotService(
       (ref, snap)
     }
 
-    val nextEnemies = enemiesAll.map(e => e.id -> e).toMap
+    val nextEnemies = enemiesAll.map(e => e.id() -> e).toMap
     (
       copy(
         blockCacheByPlayer = nextBlockCache,
