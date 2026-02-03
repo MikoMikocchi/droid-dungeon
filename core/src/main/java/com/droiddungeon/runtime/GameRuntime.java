@@ -181,7 +181,6 @@ public final class GameRuntime {
     updater = new GameUpdater(config, cameraController, movementController);
 
     entityWorld = new EntityWorld();
-    inventory = new Inventory();
     if (textureLoader != null) {
       String itemsPath = Gdx.files.internal("items.txt").file().getAbsolutePath();
       itemRegistry = ItemRegistry.loadWithLoader(itemsPath, textureLoader);
@@ -190,12 +189,13 @@ public final class GameRuntime {
     }
     GroundItemStore gs = new GroundItemStore(entityWorld, itemRegistry);
     this.groundStore = gs;
-    inventorySystem = new InventorySystem(inventory, itemRegistry, grid, entityWorld, gs);
     enemySystem = new EnemySystem(grid, worldSeed, entityWorld, gs);
     contextFactory =
         new GameContextFactory(
             config, grid, spawnX, spawnY, worldSeed, itemRegistry, entityWorld, enemySystem, gs);
     context = contextFactory.createContext();
+    inventory = context.inventory();
+    inventorySystem = context.inventorySystem();
     weaponSystem = context.weaponSystem();
     weaponState = weaponSystem.getState();
     mapOverlay.clearExplored();
@@ -365,9 +365,6 @@ public final class GameRuntime {
     spawnX = layout.spawnX();
     spawnY = layout.spawnY();
 
-    inventory = new Inventory();
-    inventorySystem =
-        new InventorySystem(inventory, itemRegistry, grid, entityWorld, this.groundStore);
     enemySystem = new EnemySystem(grid, worldSeed, entityWorld, this.groundStore);
 
     contextFactory =
@@ -382,6 +379,8 @@ public final class GameRuntime {
             enemySystem,
             this.groundStore);
     context = contextFactory.createContext();
+    inventory = context.inventory();
+    inventorySystem = context.inventorySystem();
     weaponSystem = context.weaponSystem();
     weaponState = weaponSystem.getState();
 
