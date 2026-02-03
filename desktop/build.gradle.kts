@@ -3,7 +3,7 @@ plugins {
 }
 
 val gdxVersion: String by project
-val lwjglVersionOverride = "3.3.6"
+val lwjglVersionOverride = "3.4.0"
 
 dependencies {
     implementation(project(":core"))
