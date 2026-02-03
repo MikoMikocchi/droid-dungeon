@@ -10,6 +10,7 @@ repositories {
 
 val scalaVersion = "3.8.1"
 val pekkoVersion = "1.3.0"
+val zincVersionOverride = "1.10.7"
 
 dependencies {
     implementation(project(":core"))
@@ -26,6 +27,9 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:2.17.2")
     implementation("ch.qos.logback:logback-classic:1.4.14")
     implementation("com.typesafe:config:1.4.3")
+
+    // Override default Zinc toolchain version for Scala compilation
+    zinc("org.scala-sbt:zinc_2.13:$zincVersionOverride")
 }
 
 application {
@@ -39,6 +43,19 @@ tasks.withType<ScalaCompile>().configureEach {
             "-unchecked",
             "-Wunused:all" // required for scalafix RemoveUnused rule on Scala 3.3.4+
         )
+    }
+}
+
+scala {
+    zincVersion.set(zincVersionOverride)
+}
+
+configurations.named("zinc") {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "net.openhft" && requested.name == "zero-allocation-hashing") {
+            useVersion("0.27ea1")
+            because("Java 25: prefer latest hashing library to reduce reliance on deprecated sun.misc.Unsafe APIs")
+        }
     }
 }
 
