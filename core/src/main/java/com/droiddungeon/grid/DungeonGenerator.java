@@ -1,5 +1,10 @@
 package com.droiddungeon.grid;
 
+import com.droiddungeon.grid.room.IntRange;
+import com.droiddungeon.grid.room.IntRect;
+import com.droiddungeon.grid.room.RoomShape;
+import com.droiddungeon.grid.room.RoomTemplate;
+import com.droiddungeon.grid.room.RoomTemplates;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -149,13 +154,13 @@ public final class DungeonGenerator {
     private final int chunkSize;
     private final int corridorWidth;
 
-    private final int minRoomSize = 6;
-    private final int maxRoomSize = 14;
+    private final List<RoomTemplate> templates;
 
     public ChunkGenerator(long worldSeed, int chunkSize, int corridorWidth) {
       this.worldSeed = worldSeed;
       this.chunkSize = Math.max(24, chunkSize);
       this.corridorWidth = Math.max(1, corridorWidth);
+      this.templates = RoomTemplates.defaults();
     }
 
     public int chunkSize() {
@@ -176,12 +181,12 @@ public final class DungeonGenerator {
 
       Random rng = rngForChunk(chunkX, chunkY, 0xA55A1EAFL);
       boolean isSpawnChunk = chunkX == 0 && chunkY == 0;
-      List<Room> rooms = placeRooms(originX, originY, rng, isSpawnChunk);
+      List<GeneratedRoom> generatedRooms = placeRooms(originX, originY, rng, isSpawnChunk);
 
       // Edge connectors ensure cross-chunk continuity.
       List<Node> nodes = new ArrayList<>();
-      for (Room room : rooms) {
-        nodes.add(Node.fromRoom(room));
+      for (GeneratedRoom room : generatedRooms) {
+        nodes.add(Node.fromRoom(room.room()));
       }
 
       List<Connector> connectors = connectorsForChunk(chunkX, chunkY);
@@ -191,10 +196,12 @@ public final class DungeonGenerator {
         }
       }
 
-      carveRooms(cells, rooms, originX, originY);
+      carveRooms(cells, generatedRooms, originX, originY);
       if (nodes.size() >= 2) {
         connectNodesMst(cells, nodes);
       }
+      List<Room> rooms =
+          generatedRooms.stream().map(GeneratedRoom::room).toList();
       return new Chunk(chunkX, chunkY, originX, originY, cells, rooms);
     }
 
@@ -210,63 +217,102 @@ public final class DungeonGenerator {
       return chunk.rooms().isEmpty() ? null : chunk.rooms().getFirst();
     }
 
-    private List<Room> placeRooms(int originX, int originY, Random rng, boolean forceSafeCenter) {
+    private List<GeneratedRoom> placeRooms(
+        int originX, int originY, Random rng, boolean forceSafeCenter) {
       int targetRooms = 3 + rng.nextInt(2);
       int maxAttempts = 40;
-      List<Room> rooms = new ArrayList<>();
+      List<GeneratedRoom> rooms = new ArrayList<>();
 
       if (forceSafeCenter) {
-        int w = clamp(rng.nextInt(maxRoomSize - minRoomSize + 1) + minRoomSize, 8, maxRoomSize);
-        int h = clamp(rng.nextInt(maxRoomSize - minRoomSize + 1) + minRoomSize, 8, maxRoomSize);
-        int x = originX + (chunkSize - w) / 2;
-        int y = originY + (chunkSize - h) / 2;
-        Room spawn = new Room(x, y, w, h, RoomType.SAFE);
+        RoomTemplate safeTemplate =
+            templates.stream()
+                .filter(t -> t.type() == RoomType.SAFE)
+                .findFirst()
+                .orElseGet(
+                    () ->
+                        new RoomTemplate(
+                            "safe_rect_fallback",
+                            RoomType.SAFE,
+                            new IntRange(8, 14),
+                            new IntRange(8, 14),
+                            (x, y, w, h, r) -> new com.droiddungeon.grid.room.RectShape(x, y, w, h),
+                            1f));
+        RoomShape shape =
+            safeTemplate.create(
+                originX + (chunkSize - safeTemplate.widthRange().max()) / 2,
+                originY + (chunkSize - safeTemplate.heightRange().max()) / 2,
+                rng);
+        GeneratedRoom spawn = GeneratedRoom.fromTemplate(shape, safeTemplate);
         rooms.add(spawn);
       }
 
       int attempts = 0;
       while (rooms.size() < targetRooms && attempts < maxAttempts) {
         attempts++;
-        int w = rng.nextInt(maxRoomSize - minRoomSize + 1) + minRoomSize;
-        int h = rng.nextInt(maxRoomSize - minRoomSize + 1) + minRoomSize;
+        RoomTemplate template = weightedTemplate(rng);
+
+        // Place top-left with 2 tile padding to chunk border.
+        int w = template.widthRange().random(rng);
+        int h = template.heightRange().random(rng);
         int x = originX + rng.nextInt(Math.max(1, chunkSize - w - 4)) + 2;
         int y = originY + rng.nextInt(Math.max(1, chunkSize - h - 4)) + 2;
 
-        Room candidate = new Room(x, y, w, h, randomRoomType(rng));
-        if (overlapsExisting(candidate, rooms)) {
+        RoomShape shape = template.shapeFactory().create(x, y, w, h, rng);
+        IntRect bounds = shape.bounds();
+
+        // Skip if bounds fall outside chunk (with 1 tile slack) to keep streaming simple.
+        if (bounds.x() < originX + 1
+            || bounds.maxX() > originX + chunkSize - 2
+            || bounds.y() < originY + 1
+            || bounds.maxY() > originY + chunkSize - 2) {
           continue;
         }
-        rooms.add(candidate);
+
+        if (overlapsExisting(bounds, rooms)) {
+          continue;
+        }
+        rooms.add(GeneratedRoom.fromTemplate(shape, template));
       }
       return rooms;
     }
 
-    private RoomType randomRoomType(Random rng) {
-      return rng.nextFloat() < 0.58f ? RoomType.SAFE : RoomType.DANGER;
+    private RoomTemplate weightedTemplate(Random rng) {
+      float total = 0f;
+      for (RoomTemplate t : templates) {
+        total += t.weight();
+      }
+      float r = rng.nextFloat() * total;
+      float accum = 0f;
+      for (RoomTemplate t : templates) {
+        accum += t.weight();
+        if (r <= accum) {
+          return t;
+        }
+      }
+      return templates.getFirst();
     }
 
-    private boolean overlapsExisting(Room candidate, List<Room> rooms) {
+    private boolean overlapsExisting(IntRect candidateBounds, List<GeneratedRoom> rooms) {
       int pad = 2;
-      int cx0 = candidate.x - pad;
-      int cy0 = candidate.y - pad;
-      int cx1 = candidate.x + candidate.width + pad;
-      int cy1 = candidate.y + candidate.height + pad;
-      for (Room room : rooms) {
-        int rx0 = room.x;
-        int ry0 = room.y;
-        int rx1 = room.x + room.width;
-        int ry1 = room.y + room.height;
-        if (cx0 < rx1 && cx1 > rx0 && cy0 < ry1 && cy1 > ry0) {
+      for (GeneratedRoom gr : rooms) {
+        if (candidateBounds.overlaps(gr.shape().bounds(), pad)) {
           return true;
         }
       }
       return false;
     }
 
-    private void carveRooms(TileCell[][] cells, List<Room> rooms, int originX, int originY) {
-      for (Room room : rooms) {
-        for (int x = room.x; x < room.x + room.width; x++) {
-          for (int y = room.y; y < room.y + room.height; y++) {
+    private void carveRooms(
+        TileCell[][] cells, List<GeneratedRoom> rooms, int originX, int originY) {
+      for (GeneratedRoom gr : rooms) {
+        Room room = gr.room();
+        RoomShape shape = gr.shape();
+        IntRect b = shape.bounds();
+        for (int x = b.x(); x <= b.maxX(); x++) {
+          for (int y = b.y(); y <= b.maxY(); y++) {
+            if (!shape.contains(x, y)) {
+              continue;
+            }
             int lx = x - originX;
             int ly = y - originY;
             if (lx < 0 || lx >= chunkSize || ly < 0 || ly >= chunkSize) {
@@ -496,5 +542,13 @@ public final class DungeonGenerator {
     }
 
     private record Connector(int x, int y, Direction direction, boolean open) {}
+
+    private record GeneratedRoom(Room room, RoomShape shape) {
+      static GeneratedRoom fromTemplate(RoomShape shape, RoomTemplate template) {
+        IntRect b = shape.bounds();
+        Room room = new Room(b.x(), b.y(), b.width(), b.height(), template.type());
+        return new GeneratedRoom(room, shape);
+      }
+    }
   }
 }
