@@ -121,6 +121,8 @@ public final class GameRenderCoordinator {
       debugVisible = !debugVisible;
     }
 
+    worldRenderer.renderRoomDebug(worldViewport, ctx.grid(), debugVisible);
+
     String debugText = null;
     if (debugVisible) {
       debugText =

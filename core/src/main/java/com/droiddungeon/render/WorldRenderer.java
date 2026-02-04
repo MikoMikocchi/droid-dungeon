@@ -78,7 +78,6 @@ public final class WorldRenderer {
     spriteBatch.end();
 
     renderMiningHighlight(miningTarget, gridOriginX, gridOriginY, tileSize);
-    renderRoomCorners(grid, tileSize, visible);
     renderWeaponFan(weaponState, player, gridOriginX, gridOriginY, tileSize);
 
     spriteBatch.begin();
@@ -555,37 +554,75 @@ public final class WorldRenderer {
     }
   }
 
-  private void renderRoomCorners(Grid grid, float tileSize, VisibleWindow visible) {
+  /** Debug-only room outline overlay, rendered in world space after lighting/compositing. */
+  public void renderRoomDebug(Viewport viewport, Grid grid, boolean visible) {
+    if (!visible) {
+      return;
+    }
+    viewport.apply(false);
+    shapeRenderer.setProjectionMatrix(viewport.getCamera().combined);
+    spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
+
+    float tileSize = grid.getTileSize();
+    VisibleWindow window = VisibleWindow.from(viewport, tileSize);
     List<Room> rooms =
         grid.getRoomsInArea(
-            visible.minTileX - 2, visible.minTileY - 2, visible.maxTileX + 2, visible.maxTileY + 2);
+            window.minTileX - 2, window.minTileY - 2, window.maxTileX + 2, window.maxTileY + 2);
     if (rooms.isEmpty()) {
       return;
     }
 
-    float pad = tileSize * 0.18f;
-    float segment = tileSize * 1.15f;
-    float thickness = Math.max(2f, tileSize * 0.12f);
+    float thickness = Math.max(1.5f, tileSize * 0.05f);
 
-    shapeRenderer.begin(ShapeType.Filled);
+    shapeRenderer.begin(ShapeType.Line);
     for (Room room : rooms) {
       Color tint = room.type == RoomType.SAFE ? SAFE_TINT : DANGER_TINT;
-      shapeRenderer.setColor(tint.r, tint.g, tint.b, 1f);
-
-      float x0 = room.x * tileSize - pad;
-      float y0 = room.y * tileSize - pad;
-      float x1 = x0 + room.width * tileSize + pad * 2f;
-      float y1 = y0 + room.height * tileSize + pad * 2f;
-
-      shapeRenderer.rect(x0, y1 - thickness, segment, thickness);
-      shapeRenderer.rect(x0, y1 - segment, thickness, segment);
-      shapeRenderer.rect(x1 - segment, y1 - thickness, segment, thickness);
-      shapeRenderer.rect(x1 - thickness, y1 - segment, thickness, segment);
-      shapeRenderer.rect(x0, y0, segment, thickness);
-      shapeRenderer.rect(x0, y0, thickness, segment);
-      shapeRenderer.rect(x1 - segment, y0, segment, thickness);
-      shapeRenderer.rect(x1 - thickness, y0, thickness, segment);
+      shapeRenderer.setColor(tint.r, tint.g, tint.b, 0.95f);
+      // iterate tiles inside AABB; draw edge if neighbor is not the same room type
+      int maxX = room.x + room.width - 1;
+      int maxY = room.y + room.height - 1;
+      for (int x = room.x; x <= maxX; x++) {
+        for (int y = room.y; y <= maxY; y++) {
+          if (!isRoomTile(grid, room, x, y)) {
+            continue;
+          }
+          float wx = x * tileSize;
+          float wy = y * tileSize;
+          if (!isRoomTile(grid, room, x - 1, y)) {
+            shapeRenderer.rectLine(wx, wy, wx, wy + tileSize, thickness);
+          }
+          if (!isRoomTile(grid, room, x + 1, y)) {
+            shapeRenderer.rectLine(wx + tileSize, wy, wx + tileSize, wy + tileSize, thickness);
+          }
+          if (!isRoomTile(grid, room, x, y - 1)) {
+            shapeRenderer.rectLine(wx, wy, wx + tileSize, wy, thickness);
+          }
+          if (!isRoomTile(grid, room, x, y + 1)) {
+            shapeRenderer.rectLine(wx, wy + tileSize, wx + tileSize, wy + tileSize, thickness);
+          }
+        }
+      }
     }
     shapeRenderer.end();
+
+    // Extra debug annotations per room (type and size).
+    spriteBatch.begin();
+    for (Room room : rooms) {
+      Color tint = room.type == RoomType.SAFE ? SAFE_TINT : DANGER_TINT;
+      font.setColor(tint);
+      String label = room.type + " " + room.width + "x" + room.height;
+      glyphLayout.setText(font, label);
+      float cx = (room.x + room.width * 0.5f) * tileSize - glyphLayout.width * 0.5f;
+      float cy = (room.y + room.height * 0.5f) * tileSize + glyphLayout.height * 0.5f;
+      font.draw(spriteBatch, glyphLayout, cx, cy);
+    }
+    spriteBatch.end();
+  }
+
+  private boolean isRoomTile(Grid grid, Room room, int x, int y) {
+    if (x < room.x || x >= room.x + room.width || y < room.y || y >= room.y + room.height) {
+      return false;
+    }
+    return grid.getRoomType(x, y) == room.type;
   }
 }

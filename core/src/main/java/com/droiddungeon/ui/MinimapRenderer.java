@@ -9,8 +9,6 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.droiddungeon.enemies.Enemy;
 import com.droiddungeon.grid.BlockMaterial;
-import com.droiddungeon.grid.DungeonGenerator.Room;
-import com.droiddungeon.grid.DungeonGenerator.RoomType;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import java.util.List;
@@ -110,34 +108,8 @@ public final class MinimapRenderer {
     }
     shapeRenderer.end();
 
-    // Room corners + markers + enemies + entities
+    // Markers + entities
     shapeRenderer.begin(ShapeType.Filled);
-    List<Room> rooms = grid.getRoomsInArea(minX, minY, minX + windowSize, minY + windowSize);
-    float cornerThickness = Math.max(1.2f, tile * 0.18f);
-    float segment = tile * 1.1f;
-    for (Room room : rooms) {
-      if (explored != null && !roomExplored(room, explored)) {
-        continue;
-      }
-      Color tint =
-          room.type == RoomType.SAFE
-              ? new Color(0.30f, 0.55f, 0.95f, 1f)
-              : new Color(0.82f, 0.25f, 0.25f, 1f);
-      shapeRenderer.setColor(tint);
-      float rx0 = originX + (room.x - minX) * tile - cornerThickness;
-      float ry0 = originY + (room.y - minY) * tile - cornerThickness;
-      float rx1 = rx0 + room.width * tile + cornerThickness * 2f;
-      float ry1 = ry0 + room.height * tile + cornerThickness * 2f;
-      shapeRenderer.rect(rx0, ry1 - cornerThickness, segment, cornerThickness);
-      shapeRenderer.rect(rx0, ry1 - segment, cornerThickness, segment);
-      shapeRenderer.rect(rx1 - segment, ry1 - cornerThickness, segment, cornerThickness);
-      shapeRenderer.rect(rx1 - cornerThickness, ry1 - segment, cornerThickness, segment);
-      shapeRenderer.rect(rx0, ry0, segment, cornerThickness);
-      shapeRenderer.rect(rx0, ry0, cornerThickness, segment);
-      shapeRenderer.rect(rx1 - segment, ry0, segment, cornerThickness);
-      shapeRenderer.rect(rx1 - cornerThickness, ry0, cornerThickness, segment);
-    }
-
     float playerX = originX + (radius + 0.5f) * tile;
     float playerY = originY + (radius + 0.5f) * tile;
     float markerSize = Math.max(3f, tile * 0.55f);
@@ -218,14 +190,5 @@ public final class MinimapRenderer {
 
   public void dispose() {
     shapeRenderer.dispose();
-  }
-
-  private boolean roomExplored(
-      Room room, java.util.function.BiPredicate<Integer, Integer> explored) {
-    if (explored == null) return true;
-    return explored.test(room.x, room.y)
-        || explored.test(room.x + room.width - 1, room.y)
-        || explored.test(room.x, room.y + room.height - 1)
-        || explored.test(room.x + room.width - 1, room.y + room.height - 1);
   }
 }

@@ -240,14 +240,6 @@ public final class MapOverlay {
     camY = MathUtils.clamp(camY, minY, maxY);
   }
 
-  private boolean isRoomExplored(com.droiddungeon.grid.DungeonGenerator.Room room) {
-    // quick check on corners; if none explored, skip drawing
-    return isExplored(room.x, room.y)
-        || isExplored(room.x + room.width - 1, room.y)
-        || isExplored(room.x, room.y + room.height - 1)
-        || isExplored(room.x + room.width - 1, room.y + room.height - 1);
-  }
-
   private long key(int x, int y) {
     return ((long) x << 32) ^ (y & 0xffffffffL);
   }
@@ -407,51 +399,6 @@ public final class MapOverlay {
     }
     shapeRenderer.end();
 
-    renderRoomCorners(grid, minTileX, minTileY, maxTileX, maxTileY, centerX, centerY);
-  }
-
-  private void renderRoomCorners(
-      Grid grid,
-      int minTileX,
-      int minTileY,
-      int maxTileX,
-      int maxTileY,
-      float centerX,
-      float centerY) {
-    java.util.List<com.droiddungeon.grid.DungeonGenerator.Room> rooms =
-        grid.getRoomsInArea(minTileX, minTileY, maxTileX, maxTileY);
-    if (rooms.isEmpty()) {
-      return;
-    }
-    float thickness = Math.max(1.6f, zoom * 0.12f);
-    float segment = zoom * 1.1f;
-    float pad = zoom * 0.18f;
-
-    shapeRenderer.begin(ShapeType.Filled);
-    for (com.droiddungeon.grid.DungeonGenerator.Room room : rooms) {
-      if (!isRoomExplored(room)) {
-        continue;
-      }
-      Color tint =
-          room.type == com.droiddungeon.grid.DungeonGenerator.RoomType.SAFE
-              ? new Color(0.30f, 0.55f, 0.95f, 1f)
-              : new Color(0.82f, 0.25f, 0.25f, 1f);
-      shapeRenderer.setColor(tint);
-      float x0 = centerX + (room.x - camX) * zoom - pad;
-      float y0 = centerY + (room.y - camY) * zoom - pad;
-      float x1 = x0 + room.width * zoom + pad * 2f;
-      float y1 = y0 + room.height * zoom + pad * 2f;
-
-      shapeRenderer.rect(x0, y1 - thickness, segment, thickness);
-      shapeRenderer.rect(x0, y1 - segment, thickness, segment);
-      shapeRenderer.rect(x1 - segment, y1 - thickness, segment, thickness);
-      shapeRenderer.rect(x1 - thickness, y1 - segment, thickness, segment);
-      shapeRenderer.rect(x0, y0, segment, thickness);
-      shapeRenderer.rect(x0, y0, thickness, segment);
-      shapeRenderer.rect(x1 - segment, y0, segment, thickness);
-      shapeRenderer.rect(x1 - thickness, y0, thickness, segment);
-    }
-    shapeRenderer.end();
   }
 
   private void renderMarkers(
