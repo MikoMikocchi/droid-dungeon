@@ -110,6 +110,12 @@ public final class SaveManager {
   }
 
   public SaveGame createEmpty(String worldName, long seed) throws IOException {
+    SaveGame.ItemStackState[] starterInventory =
+        new SaveGame.ItemStackState[] {
+          new SaveGame.ItemStackState("chest", 1, 0),
+          new SaveGame.ItemStackState("steel_pickaxe", 1, 280)
+        };
+
     SaveGame save =
         new SaveGame(
             worldName,
@@ -121,7 +127,8 @@ public final class SaveManager {
             0,
             null,
             null,
-            new SaveGame.ItemStackState[0],
+            starterInventory,
+            List.of(),
             List.of(),
             List.of(),
             1);

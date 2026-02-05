@@ -146,10 +146,12 @@ public final class GameRenderCoordinator {
     hudRenderer.render(
         uiViewport,
         ctx.inventory(),
+        ctx.inventorySystem().getChestSlots(),
         ctx.itemRegistry(),
         ctx.inventorySystem().getCraftingSystem(),
         ctx.inventorySystem().getCursorStack(),
         ctx.inventorySystem().isInventoryOpen(),
+        ctx.inventorySystem().isChestOpen(),
         ctx.inventorySystem().getSelectedSlotIndex(),
         input.hoveredSlot(),
         input.hoveredRecipeIcon(),

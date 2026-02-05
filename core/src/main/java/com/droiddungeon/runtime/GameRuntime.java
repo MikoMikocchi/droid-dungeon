@@ -24,6 +24,7 @@ import com.droiddungeon.input.MovementIntent;
 import com.droiddungeon.input.WeaponInput;
 import com.droiddungeon.inventory.Inventory;
 import com.droiddungeon.inventory.ItemStack;
+import com.droiddungeon.items.ChestStore;
 import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemDefinition;
 import com.droiddungeon.items.ItemRegistry;
@@ -96,6 +97,7 @@ public final class GameRuntime {
   private ItemRegistry itemRegistry;
   private InventorySystem inventorySystem;
   private GroundItemStore groundStore;
+  private ChestStore chestStore;
   private EntityWorld entityWorld;
   private EnemySystem enemySystem;
 
@@ -189,10 +191,20 @@ public final class GameRuntime {
     }
     GroundItemStore gs = new GroundItemStore(entityWorld, itemRegistry);
     this.groundStore = gs;
+    this.chestStore = new ChestStore();
     enemySystem = new EnemySystem(grid, worldSeed, entityWorld, gs);
     contextFactory =
         new GameContextFactory(
-            config, grid, spawnX, spawnY, worldSeed, itemRegistry, entityWorld, enemySystem, gs);
+            config,
+            grid,
+            spawnX,
+            spawnY,
+            worldSeed,
+            itemRegistry,
+            entityWorld,
+            enemySystem,
+            gs,
+            chestStore);
     context = contextFactory.createContext();
     inventory = context.inventory();
     inventorySystem = context.inventorySystem();
@@ -366,6 +378,7 @@ public final class GameRuntime {
     spawnY = layout.spawnY();
 
     enemySystem = new EnemySystem(grid, worldSeed, entityWorld, this.groundStore);
+    chestStore = new ChestStore();
 
     contextFactory =
         new GameContextFactory(
@@ -377,7 +390,8 @@ public final class GameRuntime {
             itemRegistry,
             entityWorld,
             enemySystem,
-            this.groundStore);
+            this.groundStore,
+            chestStore);
     context = contextFactory.createContext();
     inventory = context.inventory();
     inventorySystem = context.inventorySystem();
@@ -453,11 +467,22 @@ public final class GameRuntime {
     for (BlockChangeDto bc : changes) {
       String id = bc.materialId();
       if (id == null || id.isEmpty()) {
+        if (chestStore != null) {
+          chestStore.drain(bc.x(), bc.y());
+          if (context.inventorySystem().isChestOpen()
+              && context.inventorySystem().getChestSlotCount() > 0) {
+            // close if we were viewing this chest
+            context.inventorySystem().closeChest();
+          }
+        }
         grid.setBlock(bc.x(), bc.y(), null);
         continue;
       }
       try {
         BlockMaterial mat = BlockMaterial.valueOf(id);
+        if (mat != BlockMaterial.CHEST && chestStore != null) {
+          chestStore.drain(bc.x(), bc.y());
+        }
         grid.setBlock(bc.x(), bc.y(), mat);
         float desiredHp = bc.blockHp();
         float maxHp = mat.maxHealth();
@@ -579,6 +604,10 @@ public final class GameRuntime {
     if (rapierDef != null) {
       inv.add(new ItemStack("steel_rapier", 1, rapierDef.maxDurability()), itemRegistry);
     }
+    ItemDefinition chestDef = itemRegistry.get("chest");
+    if (chestDef != null) {
+      inv.add(new ItemStack("chest", 1, chestDef.maxDurability()), itemRegistry);
+    }
     ItemDefinition pickaxeDef = itemRegistry.get("steel_pickaxe");
     if (pickaxeDef != null) {
       inv.add(new ItemStack("steel_pickaxe", 1, pickaxeDef.maxDurability()), itemRegistry);
@@ -594,6 +623,7 @@ public final class GameRuntime {
   /** Capture a save snapshot of the current world. */
   public SaveGame snapshotSave(String worldName) {
     if (context == null) return null;
+    context.inventorySystem().closeChest();
 
     var grid = context.grid();
     int minX = grid.getMinGeneratedX();
@@ -645,6 +675,7 @@ public final class GameRuntime {
             context.companionSystem().getRenderY(),
             context.companionSystem().getGridX(),
             context.companionSystem().getGridY());
+    var chestStates = context.chestStore().toSaveStates();
 
     return new SaveGame(
         worldName,
@@ -658,6 +689,7 @@ public final class GameRuntime {
         cs,
         invStates,
         blockCells,
+        chestStates,
         groundSnapshots,
         EntityIds.peek());
   }
@@ -665,6 +697,7 @@ public final class GameRuntime {
   /** Apply a previously saved snapshot to the current runtime (after create). */
   private void applySave(SaveGame save) {
     if (save == null || context == null) return;
+    context.inventorySystem().closeChest();
     if (save.seed != 0) {
       this.worldSeed = save.seed;
     }
@@ -746,5 +779,8 @@ public final class GameRuntime {
         inventory.set(i, s != null ? s.toItemStack() : null);
       }
     }
+
+    chestStore.clear();
+    chestStore.loadFrom(save.chests);
   }
 }

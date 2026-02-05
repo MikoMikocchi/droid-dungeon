@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.droiddungeon.crafting.CraftingRecipes;
 import com.droiddungeon.crafting.CraftingSystem;
 import com.droiddungeon.entity.EntityWorld;
+import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
@@ -23,6 +24,7 @@ public final class InventorySystem {
   private final Grid grid;
   private final CraftingSystem craftingSystem;
   private final GroundItemStore groundStore;
+  private ChestSession chestSession;
   private int selectedRecipeIndex;
 
   private ItemStack cursorStack;
@@ -51,9 +53,13 @@ public final class InventorySystem {
 
   public void updateInput() {
     if (Gdx.input.isKeyJustPressed(Input.Keys.E)) {
-      toggleInventory();
+      if (isChestOpen()) {
+        closeChest();
+      } else {
+        toggleInventory();
+      }
     }
-    int hotbarKeySlot = pollHotbarNumberKey();
+    int hotbarKeySlot = inventoryOpen || isChestOpen() ? -1 : pollHotbarNumberKeyInternal();
     if (hotbarKeySlot != -1) {
       selectedSlotIndex = hotbarKeySlot;
       updateEquippedFromSelection();
@@ -71,8 +77,12 @@ public final class InventorySystem {
   public void dropCurrentStack(Player player) {
     ItemStack toDrop = cursorStack;
     boolean fromCursor = true;
+    int playerSlotIndex = resolvePlayerSlotForSelection();
     if (toDrop == null) {
-      toDrop = inventory.get(selectedSlotIndex);
+      if (playerSlotIndex == -1) {
+        return;
+      }
+      toDrop = inventory.get(playerSlotIndex);
       fromCursor = false;
     }
     if (toDrop == null) {
@@ -82,7 +92,7 @@ public final class InventorySystem {
     if (fromCursor) {
       cursorStack = null;
     } else {
-      inventory.set(selectedSlotIndex, null);
+      inventory.set(playerSlotIndex, null);
     }
     updateEquippedFromSelection();
   }
@@ -138,6 +148,27 @@ public final class InventorySystem {
   }
 
   public void onSlotClicked(int slotIndex) {
+    if (slotIndex < 0) return;
+    if (isChestOpen()) {
+      int chestSlots = chestSession.slots.length;
+      if (slotIndex < chestSlots) {
+        chestSession.slots =
+            handleSlotClick(chestSession.slots, slotIndex, chestSlots, true, itemRegistry);
+        chestSession.dirty = true;
+        selectedSlotIndex = slotIndex; // combined index
+        return;
+      } else {
+        int playerIndex = slotIndex - chestSlots;
+        if (playerIndex < 0 || playerIndex >= inventory.size()) return;
+        int combinedIndex = slotIndex;
+        handlePlayerClick(playerIndex, combinedIndex);
+        return;
+      }
+    }
+    handlePlayerClick(slotIndex, slotIndex);
+  }
+
+  private void handlePlayerClick(int slotIndex, int selectionIndex) {
     ItemStack slotStack = inventory.get(slotIndex);
 
     if (cursorStack == null) {
@@ -145,7 +176,7 @@ public final class InventorySystem {
         cursorStack = slotStack;
         inventory.set(slotIndex, null);
       }
-      selectedSlotIndex = slotIndex;
+      selectedSlotIndex = selectionIndex;
       updateEquippedFromSelection();
       return;
     }
@@ -153,7 +184,7 @@ public final class InventorySystem {
     if (slotStack == null) {
       inventory.set(slotIndex, cursorStack);
       cursorStack = null;
-      selectedSlotIndex = slotIndex;
+      selectedSlotIndex = selectionIndex;
       updateEquippedFromSelection();
       return;
     }
@@ -169,7 +200,7 @@ public final class InventorySystem {
         } else {
           cursorStack = cursorStack.withCount(cursorStack.count() - toTransfer);
         }
-        selectedSlotIndex = slotIndex;
+        selectedSlotIndex = selectionIndex;
         updateEquippedFromSelection();
         return;
       }
@@ -177,7 +208,7 @@ public final class InventorySystem {
 
     inventory.set(slotIndex, cursorStack);
     cursorStack = slotStack;
-    selectedSlotIndex = slotIndex;
+    selectedSlotIndex = selectionIndex;
     updateEquippedFromSelection();
   }
 
@@ -217,7 +248,12 @@ public final class InventorySystem {
   }
 
   public void forceCloseInventory() {
-    inventoryOpen = false;
+    if (isChestOpen()) {
+      closeChest();
+    } else {
+      inventoryOpen = false;
+      updateEquippedFromSelection();
+    }
   }
 
   public CraftingSystem getCraftingSystem() {
@@ -251,7 +287,7 @@ public final class InventorySystem {
   }
 
   public boolean isInventoryOpen() {
-    return inventoryOpen;
+    return inventoryOpen || isChestOpen();
   }
 
   public int getSelectedSlotIndex() {
@@ -267,6 +303,43 @@ public final class InventorySystem {
       return null;
     }
     return inventory.get(equippedSlotIndex);
+  }
+
+  /** Attempt to place a block from the selected hotbar slot at world tile. */
+  public boolean placeBlock(int x, int y) {
+    int slot = selectedSlotIndex;
+    if (slot < 0 || slot >= Inventory.TOTAL_SLOTS) {
+      return false;
+    }
+    ItemStack stack = inventory.get(slot);
+    if (stack == null) {
+      return false;
+    }
+    BlockMaterial mat = materialForItem(stack.itemId());
+    if (mat == null) {
+      return false;
+    }
+    if (grid.getBlockMaterial(x, y) != null) {
+      return false; // occupied
+    }
+    grid.setBlock(x, y, mat);
+    int remaining = stack.count() - 1;
+    inventory.set(slot, remaining > 0 ? stack.withCount(remaining) : null);
+    if (equippedSlotIndex == slot && remaining <= 0) {
+      updateEquippedFromSelection();
+    }
+    return true;
+  }
+
+  private BlockMaterial materialForItem(String itemId) {
+    if (itemId == null) {
+      return null;
+    }
+    return switch (itemId) {
+      case "chest" -> BlockMaterial.CHEST;
+      case "stone" -> BlockMaterial.STONE;
+      default -> null;
+    };
   }
 
   /** Decrease durability of the currently equipped item (if any) and remove it when it breaks. */
@@ -315,7 +388,61 @@ public final class InventorySystem {
     groundStore.clear();
   }
 
+  public boolean isChestOpen() {
+    return chestSession != null;
+  }
+
+  public ItemStack[] getChestSlots() {
+    return chestSession != null ? chestSession.slots : null;
+  }
+
+  public int getChestSlotCount() {
+    return chestSession != null ? chestSession.slots.length : 0;
+  }
+
+  public void openChest(int x, int y, com.droiddungeon.items.ChestStore chestStore) {
+    if (chestStore == null) return;
+    if (isChestOpen() && chestSession.x == x && chestSession.y == y) {
+      return;
+    }
+    closeChest();
+    int chestSize = 27;
+    ItemStack[] slots = new ItemStack[chestSize];
+    var contents = chestStore.peek(x, y);
+    for (int i = 0; i < Math.min(chestSize, contents.size()); i++) {
+      slots[i] = contents.get(i);
+    }
+    chestSession = new ChestSession(x, y, slots, chestStore, selectedSlotIndex);
+    inventoryOpen = true;
+  }
+
+  public void closeChest() {
+    if (chestSession == null) return;
+    ChestSession session = chestSession;
+    if (session.dirty) {
+      List<ItemStack> items = new ArrayList<>();
+      for (ItemStack s : session.slots) {
+        if (s != null && s.count() > 0) {
+          items.add(s);
+        }
+      }
+      session.store.upsert(session.x, session.y, items);
+    }
+    int restore = session.prevSelectedSlotIndex;
+    chestSession = null;
+    inventoryOpen = false;
+    if (restore < 0 || restore >= Inventory.TOTAL_SLOTS) {
+      restore = Math.max(0, Math.min(Inventory.HOTBAR_SLOTS - 1, restore));
+    }
+    selectedSlotIndex = restore;
+    updateEquippedFromSelection();
+  }
+
   private void updateEquippedFromSelection() {
+    if (isChestOpen()) {
+      equippedSlotIndex = -1;
+      return;
+    }
     if (selectedSlotIndex < 0 || selectedSlotIndex >= Inventory.HOTBAR_SLOTS) {
       equippedSlotIndex = -1;
       return;
@@ -349,6 +476,14 @@ public final class InventorySystem {
   }
 
   private static int pollHotbarNumberKey() {
+    // hotbar keys are disabled when any UI inventory is open
+    // (inventoryOpen is true for chest too)
+    // this check is handled by caller, but keep guard here if reused
+    // elsewhere.
+    return pollHotbarNumberKeyInternal();
+  }
+
+  private static int pollHotbarNumberKeyInternal() {
     // 1..9 -> slots 0..8, 0 -> slot 9.
     if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_1)
         || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_1)) return 0;
@@ -371,5 +506,85 @@ public final class InventorySystem {
     if (Gdx.input.isKeyJustPressed(Input.Keys.NUM_0)
         || Gdx.input.isKeyJustPressed(Input.Keys.NUMPAD_0)) return 9;
     return -1;
+  }
+
+  private int resolvePlayerSlotForSelection() {
+    int slot = selectedSlotIndex;
+    if (isChestOpen()) {
+      int chestSlots = chestSession.slots.length;
+      if (slot < chestSlots) {
+        slot = chestSession.prevSelectedSlotIndex;
+      } else {
+        slot -= chestSlots;
+      }
+    }
+    if (slot < 0 || slot >= inventory.size()) {
+      return -1;
+    }
+    return slot;
+  }
+
+  private ItemStack[] handleSlotClick(
+      ItemStack[] slots, int slotIndex, int totalSlots, boolean markDirty, ItemRegistry registry) {
+    ItemStack slotStack = slots[slotIndex];
+    if (cursorStack == null) {
+      if (slotStack != null) {
+        cursorStack = slotStack;
+        slots[slotIndex] = null;
+        if (markDirty) chestSession.dirty = true;
+      }
+      return slots;
+    }
+
+    if (slotStack == null) {
+      slots[slotIndex] = cursorStack;
+      cursorStack = null;
+      if (markDirty) chestSession.dirty = true;
+      return slots;
+    }
+
+    if (slotStack.canStackWith(cursorStack)) {
+      int maxStack = registry.maxStackSize(slotStack.itemId());
+      int space = maxStack - slotStack.count();
+      if (space > 0) {
+        int toTransfer = Math.min(space, cursorStack.count());
+        slots[slotIndex] = slotStack.withCount(slotStack.count() + toTransfer);
+        if (toTransfer == cursorStack.count()) {
+          cursorStack = null;
+        } else {
+          cursorStack = cursorStack.withCount(cursorStack.count() - toTransfer);
+        }
+        if (markDirty) chestSession.dirty = true;
+        return slots;
+      }
+    }
+
+    slots[slotIndex] = cursorStack;
+    cursorStack = slotStack;
+    if (markDirty) chestSession.dirty = true;
+    return slots;
+  }
+
+  private static final class ChestSession {
+    final int x;
+    final int y;
+    ItemStack[] slots;
+    final com.droiddungeon.items.ChestStore store;
+    final int prevSelectedSlotIndex;
+    boolean dirty;
+
+    ChestSession(
+        int x,
+        int y,
+        ItemStack[] slots,
+        com.droiddungeon.items.ChestStore store,
+        int prevSelectedSlotIndex) {
+      this.x = x;
+      this.y = y;
+      this.slots = slots;
+      this.store = store;
+      this.prevSelectedSlotIndex = prevSelectedSlotIndex;
+      this.dirty = false;
+    }
   }
 }

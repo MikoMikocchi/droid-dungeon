@@ -4,6 +4,7 @@ import com.droiddungeon.config.GameConfig;
 import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.DungeonGenerator;
 import com.droiddungeon.grid.Grid;
+import com.droiddungeon.items.ChestStore;
 import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.runtime.GameContextFactory;
@@ -19,6 +20,7 @@ public final class WorldInitializer {
 
     EntityWorld entityWorld = new EntityWorld();
     GroundItemStore groundStore = new GroundItemStore(entityWorld, itemRegistry);
+    ChestStore chestStore = new ChestStore();
     EnemySystem enemySystem = new EnemySystem(grid, worldSeed, entityWorld, groundStore);
 
     GameContextFactory contextFactory =
@@ -31,15 +33,17 @@ public final class WorldInitializer {
             itemRegistry,
             entityWorld,
             enemySystem,
-            groundStore);
+            groundStore,
+            chestStore);
 
-    return new WorldState(grid, entityWorld, groundStore, enemySystem, contextFactory);
+    return new WorldState(grid, entityWorld, groundStore, chestStore, enemySystem, contextFactory);
   }
 
   public record WorldState(
       Grid grid,
       EntityWorld entityWorld,
       GroundItemStore groundStore,
+      ChestStore chestStore,
       EnemySystem enemySystem,
       GameContextFactory contextFactory) {}
 }

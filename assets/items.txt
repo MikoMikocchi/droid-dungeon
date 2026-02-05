@@ -10,3 +10,4 @@ steel_axe;Steel Axe;1;textures/items/tools/steel_axe.png;true;200;AXE
 pouch;Pouch;1;textures/items/containers/pouch.png
 
 stone;Stone;64;textures/items/materials/stone.png
+chest;Chest;1;textures/items/containers/pouch.png

@@ -12,7 +12,8 @@ public enum BlockMaterial {
   DIRT(TileMaterial.DIRT, 6f, ToolType.SHOVEL, null, 0, false),
   WOOD(TileMaterial.WOOD, 6f, ToolType.AXE, null, 0, false),
   GRAVEL(TileMaterial.GRAVEL, 5f, ToolType.SHOVEL, null, 0, false),
-  PLANKS(TileMaterial.PLANKS, 5f, ToolType.AXE, null, 0, false);
+  PLANKS(TileMaterial.PLANKS, 5f, ToolType.AXE, null, 0, false),
+  CHEST(TileMaterial.PLANKS, 8f, ToolType.AXE, "chest", 1, false);
 
   private final TileMaterial floorMaterial;
   private final float maxHealth;

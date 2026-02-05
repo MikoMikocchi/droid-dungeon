@@ -6,6 +6,7 @@ import com.droiddungeon.grid.BlockMaterial;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.ItemStack;
+import com.droiddungeon.items.ChestStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.items.ToolType;
 
@@ -14,6 +15,7 @@ public final class MiningSystem {
   private final Grid grid;
   private final InventorySystem inventorySystem;
   private final ItemRegistry itemRegistry;
+  private final ChestStore chestStore;
 
   private final float baseDamagePerSecond = 12f; // tuned so stone breaks in ~1s with correct tool
   private final float reachTiles = 1.5f;
@@ -27,9 +29,15 @@ public final class MiningSystem {
   private float progressRatio = 0f;
 
   public MiningSystem(Grid grid, InventorySystem inventorySystem, ItemRegistry itemRegistry) {
+    this(grid, inventorySystem, itemRegistry, null);
+  }
+
+  public MiningSystem(
+      Grid grid, InventorySystem inventorySystem, ItemRegistry itemRegistry, ChestStore chestStore) {
     this.grid = grid;
     this.inventorySystem = inventorySystem;
     this.itemRegistry = itemRegistry;
+    this.chestStore = chestStore;
   }
 
   public void update(
@@ -103,6 +111,11 @@ public final class MiningSystem {
       if (destroyed && block.dropItemId() != null && block.dropCount() > 0) {
         inventorySystem.addGroundStack(
             targetX, targetY, new ItemStack(block.dropItemId(), block.dropCount()));
+      }
+      if (destroyed && block == BlockMaterial.CHEST && chestStore != null) {
+        for (ItemStack stack : chestStore.drain(targetX, targetY)) {
+          inventorySystem.addGroundStack(targetX, targetY, stack);
+        }
       }
       if (destroyed && equippedItem != null) {
         inventorySystem.damageEquippedItem(1);

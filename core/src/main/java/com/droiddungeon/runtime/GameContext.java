@@ -4,6 +4,7 @@ import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
+import com.droiddungeon.items.ChestStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.player.PlayerStats;
 import com.droiddungeon.systems.CompanionSystem;
@@ -21,6 +22,7 @@ public record GameContext(
     CompanionSystem companionSystem,
     EnemySystem enemySystem,
     Inventory inventory,
+    ChestStore chestStore,
     InventorySystem inventorySystem,
     ItemRegistry itemRegistry,
     WeaponSystem weaponSystem,

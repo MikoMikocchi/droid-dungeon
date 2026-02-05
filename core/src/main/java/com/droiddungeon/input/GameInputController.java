@@ -21,21 +21,28 @@ public final class GameInputController {
     // hotbar selection / inventory toggle are handled inside the system for now
     inventorySystem.updateInput();
 
-    int recipeCount = inventorySystem.getCraftingSystem().getRecipes().size();
+    boolean chestOpen = inventorySystem.isChestOpen();
+    int recipeCount = chestOpen ? 0 : inventorySystem.getCraftingSystem().getRecipes().size();
     int slotUnderCursor =
         hudRenderer.hitTestSlot(
             uiViewport,
             Gdx.input.getX(),
             Gdx.input.getY(),
             inventorySystem.isInventoryOpen(),
-            recipeCount);
+            chestOpen,
+            recipeCount,
+            inventorySystem.getChestSlotCount());
     var craftHit =
-        hudRenderer.hitTestCrafting(
-            uiViewport,
-            Gdx.input.getX(),
-            Gdx.input.getY(),
-            inventorySystem.isInventoryOpen(),
-            recipeCount);
+        chestOpen
+            ? HudRenderer.CraftingHit.none()
+            : hudRenderer.hitTestCrafting(
+                uiViewport,
+                Gdx.input.getX(),
+                Gdx.input.getY(),
+                inventorySystem.isInventoryOpen(),
+                recipeCount,
+                chestOpen,
+                inventorySystem.getChestSlotCount());
     int hoveredSlot = inventorySystem.isInventoryOpen() ? slotUnderCursor : -1;
     int hoveredRecipe = inventorySystem.isInventoryOpen() ? craftHit.iconIndex() : -1;
     boolean slotClicked = Gdx.input.justTouched() && slotUnderCursor != -1;
@@ -50,6 +57,7 @@ public final class GameInputController {
     boolean restartRequested = bindings.isJustPressed(InputAction.RESTART_RUN);
     // Hold left mouse to mine; keep reporting while pressed for hold-to-break behavior.
     boolean mineRequested = Gdx.input.isButtonPressed(Input.Buttons.LEFT) && !pointerOnUi;
+    boolean interactRequested = Gdx.input.isButtonJustPressed(Input.Buttons.RIGHT) && !pointerOnUi;
     boolean debugToggleRequested = bindings.isJustPressed(InputAction.TOGGLE_DEBUG);
 
     MovementIntent movementIntent =
@@ -90,6 +98,7 @@ public final class GameInputController {
         mapCloseRequested,
         restartRequested,
         mineRequested,
+        interactRequested,
         debugToggleRequested,
         movementIntent,
         weaponInput);

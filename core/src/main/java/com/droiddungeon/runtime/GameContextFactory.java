@@ -7,6 +7,7 @@ import com.droiddungeon.entity.EntityWorld;
 import com.droiddungeon.grid.Grid;
 import com.droiddungeon.grid.Player;
 import com.droiddungeon.inventory.Inventory;
+import com.droiddungeon.items.ChestStore;
 import com.droiddungeon.items.GroundItemStore;
 import com.droiddungeon.items.ItemRegistry;
 import com.droiddungeon.player.PlayerStats;
@@ -27,6 +28,7 @@ public final class GameContextFactory {
   private final EntityWorld entityWorld;
   private final EnemySystem enemySystem;
   private final GroundItemStore groundStore;
+  private final ChestStore chestStore;
 
   public GameContextFactory(
       GameConfig config,
@@ -37,7 +39,8 @@ public final class GameContextFactory {
       ItemRegistry itemRegistry,
       EntityWorld entityWorld,
       EnemySystem enemySystem,
-      GroundItemStore groundStore) {
+      GroundItemStore groundStore,
+      ChestStore chestStore) {
     this.config = config;
     this.grid = grid;
     this.spawnX = spawnX;
@@ -47,11 +50,13 @@ public final class GameContextFactory {
     this.entityWorld = entityWorld;
     this.enemySystem = enemySystem;
     this.groundStore = groundStore;
+    this.chestStore = chestStore;
   }
 
   public GameContext createContext() {
     entityWorld.clear();
     groundStore.clear();
+    chestStore.clear();
     enemySystem.reset();
 
     Player player = new Player(EntityIds.next(), spawnX, spawnY);
@@ -68,7 +73,7 @@ public final class GameContextFactory {
     Inventory inventory = new Inventory();
     InventorySystem inventorySystem =
         new InventorySystem(inventory, itemRegistry, grid, entityWorld, groundStore);
-    MiningSystem miningSystem = new MiningSystem(grid, inventorySystem, itemRegistry);
+    MiningSystem miningSystem = new MiningSystem(grid, inventorySystem, itemRegistry, chestStore);
     entityWorld.add(player);
     entityWorld.add(companionSystem);
 
@@ -80,6 +85,7 @@ public final class GameContextFactory {
         companionSystem,
         enemySystem,
         inventory,
+        chestStore,
         inventorySystem,
         itemRegistry,
         weaponSystem,
@@ -101,7 +107,7 @@ public final class GameContextFactory {
     InventorySystem inventorySystem =
         new InventorySystem(inventory, itemRegistry, grid, entityWorld, groundStore);
     WeaponSystem weaponSystem = setupWeapons();
-    MiningSystem miningSystem = new MiningSystem(grid, inventorySystem, itemRegistry);
+    MiningSystem miningSystem = new MiningSystem(grid, inventorySystem, itemRegistry, chestStore);
     entityWorld.add(player);
     entityWorld.add(companionSystem);
     GameContext ctx =
@@ -110,13 +116,14 @@ public final class GameContextFactory {
             entityWorld,
             player,
             playerStats,
-            companionSystem,
-            enemySystem,
-            inventory,
-            inventorySystem,
-            itemRegistry,
-            weaponSystem,
-            miningSystem);
+        companionSystem,
+        enemySystem,
+        inventory,
+        chestStore,
+        inventorySystem,
+        itemRegistry,
+        weaponSystem,
+        miningSystem);
     return new PlayerSession(
         playerId,
         player,

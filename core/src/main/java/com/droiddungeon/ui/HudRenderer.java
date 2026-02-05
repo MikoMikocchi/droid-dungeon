@@ -64,6 +64,11 @@ public final class HudRenderer {
   private float tooltipPaddingY;
   private float tooltipTextWidth;
   private float tooltipTextHeight;
+  private boolean chestOpen = false;
+  private int chestRows = 0;
+  private int chestCols = 0;
+  private float chestOriginX;
+  private float chestOriginY;
 
   public static record CraftingHit(int iconIndex, boolean insidePanel, boolean onCraftButton) {
     public static CraftingHit none() {
@@ -79,10 +84,12 @@ public final class HudRenderer {
   public void render(
       Viewport viewport,
       Inventory inventory,
+      ItemStack[] chestSlots,
       ItemRegistry itemRegistry,
       CraftingSystem craftingSystem,
       ItemStack cursorStack,
       boolean inventoryOpen,
+      boolean chestOpen,
       int selectedSlotIndex,
       int hoveredSlotIndex,
       int hoveredRecipeIndex,
@@ -95,14 +102,17 @@ public final class HudRenderer {
     spriteBatch.setProjectionMatrix(viewport.getCamera().combined);
 
     int recipeCount = craftingSystem != null ? craftingSystem.getRecipes().size() : 0;
-    cacheLayout(viewport, inventoryOpen, recipeCount);
+    cacheLayout(viewport, inventoryOpen, chestOpen, recipeCount, chestSlots != null ? chestSlots.length : 0);
 
-    updateTooltipData(viewport, inventory, itemRegistry, hoveredSlotIndex);
+    updateTooltipData(
+        viewport, inventory, itemRegistry, hoveredSlotIndex, chestSlots, chestOpen);
 
     renderShapes(
         viewport,
         inventory,
         inventoryOpen,
+        chestOpen,
+        chestSlots,
         selectedSlotIndex,
         craftingSystem,
         hoveredRecipeIndex,
@@ -118,19 +128,21 @@ public final class HudRenderer {
         hoveredRecipeIndex,
         selectedRecipeIndex,
         craftButtonHovered);
-    renderSlotContents(inventory, itemRegistry);
+    renderSlotContents(inventory, chestSlots, chestOpen, itemRegistry);
     renderTooltipText();
     renderCursorStack(viewport, itemRegistry, cursorStack);
     spriteBatch.end();
   }
 
-  private void cacheLayout(Viewport viewport, boolean inventoryOpen, int recipeCount) {
+  private void cacheLayout(
+      Viewport viewport, boolean inventoryOpen, boolean chestOpen, int recipeCount, int chestSlots) {
     float viewportWidth = viewport.getWorldWidth();
     float viewportHeight = viewport.getWorldHeight();
     float hotbarWidth = Inventory.HOTBAR_SLOTS * cellSize + (Inventory.HOTBAR_SLOTS - 1) * gap;
 
     lastRows = inventoryOpen ? 4 : 1;
     lastRecipeCount = Math.max(0, recipeCount);
+    this.chestOpen = chestOpen;
 
     float gridHeight = lastRows * cellSize + (lastRows - 1) * gap;
     float topY = viewportHeight - padding;
@@ -140,7 +152,7 @@ public final class HudRenderer {
 
     lastOriginX = padding;
     lastOriginY = gridTopY - cellSize;
-    if (!inventoryOpen) {
+    if (!inventoryOpen && !chestOpen) {
       craftingVisible = false;
       craftPanelHeight = 0f;
       craftPanelWidth = 0f;
@@ -153,19 +165,37 @@ public final class HudRenderer {
     float iconsHeight = iconRows * (craftIconSize + craftIconGap) - craftIconGap;
     float bodyHeight = iconsHeight + craftDetailGap + craftDetailHeight;
 
-    craftPanelHeight =
-        Math.max(craftHeaderHeight + craftPanelPadding * 2f + bodyHeight, gridHeight + 30f);
-    craftPanelWidth = craftPanelWidthBase;
+    if (chestOpen) {
+      craftingVisible = false;
+      craftPanelHeight = 0f;
+      craftPanelWidth = 0f;
+      craftPanelX = 0f;
+      craftPanelY = 0f;
+      // chest grid just above player grid
+      chestCols = 9;
+      chestRows = Math.max(1, (int) Math.ceil(chestSlots / (float) chestCols));
+      chestOriginX = lastOriginX;
+      float lastRowY = rowY(lastRows - 1); // bottom-left y of last inventory row
+      chestOriginY = lastRowY - gap - (cellSize + gap) * chestRows;
+      return;
+    } else {
+      craftPanelHeight =
+          Math.max(craftHeaderHeight + craftPanelPadding * 2f + bodyHeight, gridHeight + 30f);
+      craftPanelWidth = craftPanelWidthBase;
 
-    craftPanelX = lastOriginX + gridWidth + craftPanelGap;
-    craftPanelY = topY - craftPanelHeight;
-    craftingVisible = true;
+      craftPanelX = lastOriginX + gridWidth + craftPanelGap;
+      craftPanelY = topY - craftPanelHeight;
+      craftingVisible = true;
+      chestRows = 0;
+    }
   }
 
   private void renderShapes(
       Viewport viewport,
       Inventory inventory,
       boolean inventoryOpen,
+      boolean chestOpen,
+      ItemStack[] chestSlots,
       int selectedSlotIndex,
       CraftingSystem craftingSystem,
       int hoveredRecipeIndex,
@@ -178,15 +208,19 @@ public final class HudRenderer {
     if (inventoryOpen) {
       renderInventoryBackdropFilled(viewport.getWorldWidth(), viewport.getWorldHeight());
     }
-    renderCraftingPanelFilled(
-        craftingSystem, hoveredRecipeIndex, selectedRecipeIndex, craftButtonHovered);
-    renderSlotGridFilled(inventory, selectedSlotIndex);
+    if (!chestOpen) {
+      renderCraftingPanelFilled(
+          craftingSystem, hoveredRecipeIndex, selectedRecipeIndex, craftButtonHovered);
+    }
+    renderSlotGridFilled(inventory, chestSlots, selectedSlotIndex, chestOpen);
     renderTooltipBoxFilled();
     shapeRenderer.end();
 
     shapeRenderer.begin(ShapeType.Line);
-    renderSlotGridOutline();
-    renderCraftingOutline();
+    renderSlotGridOutline(chestSlots, chestOpen);
+    if (!chestOpen) {
+      renderCraftingOutline();
+    }
     shapeRenderer.end();
 
     Gdx.gl.glDisable(GL20.GL_BLEND);
@@ -253,7 +287,9 @@ public final class HudRenderer {
     }
   }
 
-  private void renderSlotGridFilled(Inventory inventory, int selectedSlotIndex) {
+  private void renderSlotGridFilled(
+      Inventory inventory, ItemStack[] chestSlots, int selectedSlotIndex, boolean chestMode) {
+    // Player inventory
     for (int row = 0; row < lastRows; row++) {
       for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
         float x = lastOriginX + col * (cellSize + gap);
@@ -275,31 +311,75 @@ public final class HudRenderer {
       }
     }
 
-    if (selectedSlotIndex >= 0 && selectedSlotIndex < Inventory.TOTAL_SLOTS) {
-      int selectedRow = selectedSlotIndex / Inventory.HOTBAR_SLOTS;
-      int selectedCol = selectedSlotIndex % Inventory.HOTBAR_SLOTS;
+    // Chest grid
+    if (chestMode && chestSlots != null) {
+      for (int row = 0; row < chestRows; row++) {
+        for (int col = 0; col < chestCols; col++) {
+          int idx = row * chestCols + col;
+          if (idx >= chestSlots.length) continue;
+          float x = chestOriginX + col * (cellSize + gap);
+          float y = chestOriginY - row * (cellSize + gap);
+          shapeRenderer.setColor(0.10f, 0.12f, 0.14f, 0.9f);
+          shapeRenderer.rect(x, y, cellSize, cellSize);
+        }
+      }
+    }
 
-      if (selectedRow >= 0 && selectedRow < lastRows) {
-        float x = lastOriginX + selectedCol * (cellSize + gap);
-        float y = rowY(selectedRow);
-
+    if (selectedSlotIndex >= 0
+        && selectedSlotIndex < (chestMode ? Inventory.TOTAL_SLOTS + (chestSlots != null ? chestSlots.length : 0) : Inventory.TOTAL_SLOTS)) {
+      int slotIndex = selectedSlotIndex;
+      boolean inChest = chestMode && chestSlots != null && slotIndex < chestSlots.length;
+      if (inChest) {
+        int chestRow = slotIndex / chestCols;
+        int chestCol = slotIndex % chestCols;
+        float x = chestOriginX + chestCol * (cellSize + gap);
+        float y = chestOriginY - chestRow * (cellSize + gap);
         float thickness = 3f;
         shapeRenderer.setColor(1f, 0.84f, 0.35f, 1f);
         shapeRenderer.rect(x - thickness, y - thickness, cellSize + thickness * 2f, thickness);
         shapeRenderer.rect(x - thickness, y + cellSize, cellSize + thickness * 2f, thickness);
         shapeRenderer.rect(x - thickness, y, thickness, cellSize);
         shapeRenderer.rect(x + cellSize, y, thickness, cellSize);
+        return;
+      }
+      int playerIndex = chestMode ? slotIndex - (chestSlots != null ? chestSlots.length : 0) : slotIndex;
+      if (playerIndex >= 0 && playerIndex < Inventory.TOTAL_SLOTS) {
+        int selectedRow = playerIndex / Inventory.HOTBAR_SLOTS;
+        int selectedCol = playerIndex % Inventory.HOTBAR_SLOTS;
+
+        if (selectedRow >= 0 && selectedRow < lastRows) {
+          float x = lastOriginX + selectedCol * (cellSize + gap);
+          float y = rowY(selectedRow);
+
+          float thickness = 3f;
+          shapeRenderer.setColor(1f, 0.84f, 0.35f, 1f);
+          shapeRenderer.rect(x - thickness, y - thickness, cellSize + thickness * 2f, thickness);
+          shapeRenderer.rect(x - thickness, y + cellSize, cellSize + thickness * 2f, thickness);
+          shapeRenderer.rect(x - thickness, y, thickness, cellSize);
+          shapeRenderer.rect(x + cellSize, y, thickness, cellSize);
+        }
       }
     }
   }
 
-  private void renderSlotGridOutline() {
+  private void renderSlotGridOutline(ItemStack[] chestSlots, boolean chestMode) {
     shapeRenderer.setColor(0.30f, 0.30f, 0.34f, 1f);
     for (int row = 0; row < lastRows; row++) {
       for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
         float x = lastOriginX + col * (cellSize + gap);
         float y = rowY(row);
         shapeRenderer.rect(x, y, cellSize, cellSize);
+      }
+    }
+    if (chestMode && chestSlots != null) {
+      for (int row = 0; row < chestRows; row++) {
+        for (int col = 0; col < chestCols; col++) {
+          int idx = row * chestCols + col;
+          if (idx >= chestSlots.length) continue;
+          float x = chestOriginX + col * (cellSize + gap);
+          float y = chestOriginY - row * (cellSize + gap);
+          shapeRenderer.rect(x, y, cellSize, cellSize);
+        }
       }
     }
   }
@@ -528,45 +608,62 @@ public final class HudRenderer {
     return total;
   }
 
-  private void renderSlotContents(Inventory inventory, ItemRegistry itemRegistry) {
+  private void renderSlotContents(
+      Inventory inventory, ItemStack[] chestSlots, boolean chestMode, ItemRegistry itemRegistry) {
+    // Player inventory
     for (int row = 0; row < lastRows; row++) {
       for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
         int slotIndex = row * Inventory.HOTBAR_SLOTS + col;
-        ItemStack stack = inventory.get(slotIndex);
-        if (stack == null) {
-          continue;
-        }
-        ItemDefinition def = itemRegistry.get(stack.itemId());
-        if (def == null) {
-          continue;
-        }
-        TextureRegion icon = def.icon();
-        if (!hasIcon(icon)) {
-          continue;
-        }
-        float iconPadding = 8f;
-        float drawSize = cellSize - iconPadding * 2f;
-        float drawX = lastOriginX + col * (cellSize + gap) + iconPadding;
-        float drawY = rowY(row) + iconPadding;
-        spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
-
-        String countText = Integer.toString(stack.count());
-        glyphLayout.setText(font, countText);
-        float textX = drawX + drawSize - glyphLayout.width + 2f;
-        float textY = drawY + glyphLayout.height + 2f;
-        drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
-
-        int maxDurability = def.maxDurability();
-        if (maxDurability > 0) {
-          float ratio = Math.max(0f, Math.min(1f, stack.durability() / (float) maxDurability));
-          float barPad = 6f;
-          float barHeight = 5f;
-          float barWidth = cellSize - barPad * 2f;
-          float barX = lastOriginX + col * (cellSize + gap) + barPad;
-          float barY = rowY(row) + 4f;
-          drawDurabilityBar(spriteBatch, barX, barY, barWidth, barHeight, ratio);
+        renderStack(
+            inventory.get(slotIndex),
+            itemRegistry,
+            lastOriginX + col * (cellSize + gap),
+            rowY(row));
+      }
+    }
+    // Chest
+    if (chestMode && chestSlots != null) {
+      for (int row = 0; row < chestRows; row++) {
+        for (int col = 0; col < chestCols; col++) {
+          int idx = row * chestCols + col;
+          if (idx >= chestSlots.length) continue;
+          renderStack(
+              chestSlots[idx],
+              itemRegistry,
+              chestOriginX + col * (cellSize + gap),
+              chestOriginY - row * (cellSize + gap));
         }
       }
+    }
+  }
+
+  private void renderStack(ItemStack stack, ItemRegistry itemRegistry, float slotX, float slotY) {
+    if (stack == null) return;
+    ItemDefinition def = itemRegistry.get(stack.itemId());
+    if (def == null) return;
+    TextureRegion icon = def.icon();
+    if (!hasIcon(icon)) return;
+    float iconPadding = 8f;
+    float drawSize = cellSize - iconPadding * 2f;
+    float drawX = slotX + iconPadding;
+    float drawY = slotY + iconPadding;
+    spriteBatch.draw(icon, drawX, drawY, drawSize, drawSize);
+
+    String countText = Integer.toString(stack.count());
+    glyphLayout.setText(font, countText);
+    float textX = drawX + drawSize - glyphLayout.width + 2f;
+    float textY = drawY + glyphLayout.height + 2f;
+    drawCount(spriteBatch, countText, textX, textY, glyphLayout.width, glyphLayout.height);
+
+    int maxDurability = def.maxDurability();
+    if (maxDurability > 0) {
+      float ratio = Math.max(0f, Math.min(1f, stack.durability() / (float) maxDurability));
+      float barPad = 6f;
+      float barHeight = 5f;
+      float barWidth = cellSize - barPad * 2f;
+      float barX = slotX + barPad;
+      float barY = slotY + 4f;
+      drawDurabilityBar(spriteBatch, barX, barY, barWidth, barHeight, ratio);
     }
   }
 
@@ -599,14 +696,29 @@ public final class HudRenderer {
   }
 
   private void updateTooltipData(
-      Viewport viewport, Inventory inventory, ItemRegistry itemRegistry, int hoveredSlotIndex) {
+      Viewport viewport,
+      Inventory inventory,
+      ItemRegistry itemRegistry,
+      int hoveredSlotIndex,
+      ItemStack[] chestSlots,
+      boolean chestMode) {
     tooltipVisible = false;
     tooltipText = null;
 
-    if (hoveredSlotIndex < 0 || hoveredSlotIndex >= Inventory.TOTAL_SLOTS) {
+    if (hoveredSlotIndex < 0) {
       return;
     }
-    ItemStack stack = inventory.get(hoveredSlotIndex);
+    ItemStack stack = null;
+    if (chestMode && chestSlots != null && hoveredSlotIndex < chestSlots.length) {
+      stack = chestSlots[hoveredSlotIndex];
+    } else {
+      int playerIndex =
+          chestMode && chestSlots != null ? hoveredSlotIndex - chestSlots.length : hoveredSlotIndex;
+      if (playerIndex < 0 || playerIndex >= Inventory.TOTAL_SLOTS) {
+        return;
+      }
+      stack = inventory.get(playerIndex);
+    }
     if (stack == null) {
       return;
     }
@@ -796,17 +908,39 @@ public final class HudRenderer {
   }
 
   public int hitTestSlot(
-      Viewport viewport, float screenX, float screenY, boolean inventoryOpen, int recipeCount) {
-    cacheLayout(viewport, inventoryOpen, recipeCount);
+      Viewport viewport,
+      float screenX,
+      float screenY,
+      boolean inventoryOpen,
+      boolean chestOpen,
+      int recipeCount,
+      int chestSlots) {
+    cacheLayout(viewport, inventoryOpen, chestOpen, recipeCount, chestSlots);
     Vector2 world = new Vector2(screenX, screenY);
     viewport.unproject(world);
 
+    // Chest slots first
+    if (chestOpen && chestSlots > 0) {
+      for (int row = 0; row < chestRows; row++) {
+        for (int col = 0; col < chestCols; col++) {
+          int idx = row * chestCols + col;
+          if (idx >= chestSlots) continue;
+          float x = chestOriginX + col * (cellSize + gap);
+          float y = chestOriginY - row * (cellSize + gap);
+          if (world.x >= x && world.x <= x + cellSize && world.y >= y && world.y <= y + cellSize) {
+            return idx; // chest slots come first
+          }
+        }
+      }
+    }
+
+    int base = chestOpen ? chestSlots : 0;
     for (int row = 0; row < lastRows; row++) {
       for (int col = 0; col < Inventory.HOTBAR_SLOTS; col++) {
         float x = lastOriginX + col * (cellSize + gap);
         float y = rowY(row);
         if (world.x >= x && world.x <= x + cellSize && world.y >= y && world.y <= y + cellSize) {
-          return row * Inventory.HOTBAR_SLOTS + col;
+          return base + row * Inventory.HOTBAR_SLOTS + col;
         }
       }
     }
@@ -814,8 +948,14 @@ public final class HudRenderer {
   }
 
   public CraftingHit hitTestCrafting(
-      Viewport viewport, float screenX, float screenY, boolean inventoryOpen, int recipeCount) {
-    cacheLayout(viewport, inventoryOpen, recipeCount);
+      Viewport viewport,
+      float screenX,
+      float screenY,
+      boolean inventoryOpen,
+      int recipeCount,
+      boolean chestOpen,
+      int chestSlots) {
+    cacheLayout(viewport, inventoryOpen, chestOpen, recipeCount, chestSlots);
     if (!craftingVisible) {
       return CraftingHit.none();
     }

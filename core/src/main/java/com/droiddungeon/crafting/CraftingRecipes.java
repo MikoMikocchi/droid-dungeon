@@ -35,6 +35,12 @@ public final class CraftingRecipes {
             "Steel Rapier",
             "steel_rapier",
             1,
-            List.of(new CraftingIngredient("stone", 18))));
+            List.of(new CraftingIngredient("stone", 18))),
+        new CraftingRecipe(
+            "chest",
+            "Chest",
+            "chest",
+            1,
+            List.of(new CraftingIngredient("stone", 16))));
   }
 }

@@ -42,6 +42,25 @@ public final class GameUpdater {
     WeaponSystem.WeaponState weaponState;
 
     if (!dead) {
+      if (input.interactRequested()) {
+        Vector2 mouseWorld =
+            input.weaponInput() != null
+                ? new Vector2(input.weaponInput().aimWorldX(), input.weaponInput().aimWorldY())
+                : new Vector2();
+        float tileSize = worldViewportTileSize;
+        int tx = (int) Math.floor(mouseWorld.x / tileSize);
+        int ty = (int) Math.floor(mouseWorld.y / tileSize);
+        var block = ctx.grid().getBlockMaterial(tx, ty);
+        if (block == com.droiddungeon.grid.BlockMaterial.CHEST) {
+          ctx.inventorySystem().openChest(tx, ty, ctx.chestStore());
+        } else if (block == null) {
+          float dx = tx + 0.5f - (ctx.player().getRenderX() + 0.5f);
+          float dy = ty + 0.5f - (ctx.player().getRenderY() + 0.5f);
+          if (dx * dx + dy * dy <= 1.5f * 1.5f) {
+            ctx.inventorySystem().placeBlock(tx, ty);
+          }
+        }
+      }
       if (input.dropRequested()) {
         ctx.inventorySystem().dropCurrentStack(ctx.player());
       }

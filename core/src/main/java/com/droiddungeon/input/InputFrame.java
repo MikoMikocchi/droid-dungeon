@@ -16,6 +16,7 @@ public record InputFrame(
     boolean mapCloseRequested,
     boolean restartRequested,
     boolean mineRequested,
+    boolean interactRequested,
     boolean debugToggleRequested,
     MovementIntent movementIntent,
     WeaponInput weaponInput) {
@@ -41,6 +42,7 @@ public record InputFrame(
         false,
         false,
         mineRequested,
+        false,
         false,
         movement,
         weapon);

@@ -16,6 +16,7 @@ public final class SaveGame {
   public CompanionState companion;
   public ItemStackState[] inventory;
   public List<BlockCellState> blocks;
+  public List<ChestState> chests;
   public List<GroundItemState> groundItems;
   public int nextEntityId;
 
@@ -33,6 +34,7 @@ public final class SaveGame {
       CompanionState companion,
       ItemStackState[] inventory,
       List<BlockCellState> blocks,
+      List<ChestState> chests,
       List<GroundItemState> groundItems,
       int nextEntityId) {
     this.name = name;
@@ -46,6 +48,7 @@ public final class SaveGame {
     this.companion = companion;
     this.inventory = inventory;
     this.blocks = blocks;
+    this.chests = chests;
     this.groundItems = groundItems;
     this.nextEntityId = nextEntityId;
   }
@@ -145,6 +148,21 @@ public final class SaveGame {
       this.y = y;
       this.stack = stack;
       this.bundled = bundled;
+    }
+  }
+
+  /** Chest snapshot with per-slot items. */
+  public static final class ChestState {
+    public int x;
+    public int y;
+    public List<ItemStackState> items;
+
+    public ChestState() {}
+
+    public ChestState(int x, int y, List<ItemStackState> items) {
+      this.x = x;
+      this.y = y;
+      this.items = items;
     }
   }
 }
